@@ -7,18 +7,25 @@ issue tracker). It's a recipe, not a rule. Tracker coordinates live in
 superpowers** — invoke the named skill at each stage. See [`HARNESS.md`](HARNESS.md)
 for the full TDD detail.
 
-Two slash commands wrap the loop: **`/task-init`** (front half) and
-**`/task-implement`** (back half).
+Four slash commands wrap the loop — a planning pair and a building pair, each
+scaling from a single task to a whole epic/backlog: **`/task-init`** /
+**`/issues-init`** (front half) and **`/task-implement`** / **`/task-run`**
+(back half).
 
 ## TL;DR
 
 1. **`/task-init`** runs `superpowers:brainstorming` → a design at
    `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (gitignored, local-only)
    → files **issue(s)** in the configured project (`project_code`) (state `Todo`, project +
-   type labels).
+   type labels). For a broad goal, **`/issues-init`** does the same at epic scale:
+   it decomposes into many PR-sized issues, files them under a parent grouping,
+   and sets **blocks/blocked-by** relations so the backlog is pre-ordered.
 2. **`/task-implement [project_code-…]`** picks up the issue(s) and, for each,
    moves it to `In Progress` and **creates a worktree** under `.worktrees/<topic>/`
-   on a new branch (gitignored) via `superpowers:using-git-worktrees`.
+   on a new branch (gitignored) via `superpowers:using-git-worktrees`. To run the
+   backlog instead of naming issues, **`/task-run`** derives parallel/sequential
+   batches (from those relations + file-overlap), then drives this same machinery
+   batch by batch.
 3. **Dispatch a subagent** to implement inside that worktree, following TDD.
    Multiple issues → `superpowers:dispatching-parallel-agents`, one agent per
    worktree, in a single message.
@@ -108,7 +115,7 @@ minimum show the failing run in their report).
 
 ```
 .worktrees/                              # gitignored, agent worktrees
-.claude/commands/                        # /task-init, /task-implement (committed)
+.claude/commands/                        # /task-init, /issues-init, /task-implement, /task-run (committed)
 docs/
   superpowers/                           # gitignored
     specs/YYYY-MM-DD-<topic>-design.md   # design docs (issues live in the tracker, not on disk)

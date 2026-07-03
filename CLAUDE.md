@@ -68,8 +68,10 @@ tests/
 
 The full loop (brainstorm → spec → issue(s) → worktree → TDD → verify → review →
 PR) lives in [`HARNESS.md`](HARNESS.md) and [`AGENTS.md`](AGENTS.md), wrapped by
-two commands: **`/task-init`** (brainstorm → spec → file issues) and
-**`/task-implement`** (worktree → TDD → review → PR). Key rules:
+four commands — a planning pair, **`/task-init`** (one task → issue(s)) and
+**`/issues-init`** (one epic → many linked issues), and a building pair,
+**`/task-implement`** (issues you name → PRs) and **`/task-run`** (the whole
+backlog, auto-ordered → PRs). Key rules:
 
 - **Always use superpowers.** Invoke the named skill at each stage
   (`brainstorming`, `using-git-worktrees`, `test-driven-development`,
