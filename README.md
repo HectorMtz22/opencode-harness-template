@@ -4,8 +4,10 @@ A drop-in **development harness** for working with [Claude Code](https://claude.
 (and the [`superpowers`](https://github.com/obra/superpowers) plugin) on any repo.
 
 It encodes one repeatable loop — **brainstorm → spec → issue → worktree → TDD →
-verify → review → PR** — and wraps it in two slash commands so an agent (or you)
-can drive a change end-to-end without improvising the process.
+verify → review → PR** — and wraps it in slash commands so an agent (or you)
+can drive a change end-to-end without improvising the process. A planning pair
+(`/task-init`, `/issues-init`) and a building pair (`/task-implement`,
+`/task-run`) scale the loop from a single task up to a whole epic/backlog.
 
 > This template was extracted from a real multi-project repo. The project-specific
 > bits (project names, issue-tracker IDs, test commands) have been replaced with
@@ -19,7 +21,9 @@ can drive a change end-to-end without improvising the process.
 | [`HARNESS.md`](HARNESS.md) | The TDD loop in detail — the *how* of every stage. |
 | [`AGENTS.md`](AGENTS.md) | The *why* of worktrees, specs, and issue tracking. |
 | [`.claude/commands/task-init.md`](.claude/commands/task-init.md) | `/task-init` — brainstorm → local spec → file issue(s). |
+| [`.claude/commands/issues-init.md`](.claude/commands/issues-init.md) | `/issues-init` — decompose an epic → many linked issues (parent grouping + blocks relations). |
 | [`.claude/commands/task-implement.md`](.claude/commands/task-implement.md) | `/task-implement` — worktree → TDD → verify → review → PR. |
+| [`.claude/commands/task-run.md`](.claude/commands/task-run.md) | `/task-run` — read the backlog, order it (relations + file-overlap), drive `/task-implement` batch by batch. |
 | [`.claude/commands/harness-setup.md`](.claude/commands/harness-setup.md) | `/harness-setup` — choose tracker, write `.claude/tracker.md` (offline). |
 | [`.claude/commands/harness-bootstrap.md`](.claude/commands/harness-bootstrap.md) | `/harness-bootstrap` — create project, states, labels, and weekly cycles in the live tracker (idempotent). |
 | [`.claude/tracker.md`](.claude/tracker.md) | Tracker config (single source of truth). Written by `/harness-setup`. |
@@ -31,6 +35,9 @@ can drive a change end-to-end without improvising the process.
 brainstorm ─▶ spec ─▶ issue(s) ─▶ worktree ─▶ TDD ─▶ verify ─▶ review ─▶ PR
   (skill)    (local)  (tracker)  (gitignored) (R/G/R) (skill)  (skill)
 └─────────── /task-init ──────┘  └──────────── /task-implement ───────────┘
+└────────── /issues-init ──────┘  └───────────────── /task-run ────────────┘
+      (one epic → many                  (read the backlog and order
+        linked issues)                    the batches for you)
 ```
 
 - **Specs and plans stay local** under `docs/superpowers/` (gitignored). The
@@ -47,6 +54,8 @@ brainstorm ─▶ spec ─▶ issue(s) ─▶ worktree ─▶ TDD ─▶ verify 
 4. Make sure Claude Code has the `superpowers` plugin and, optionally, an MCP
    server for your issue tracker.
 5. Run `/task-init <idea>` to start a task, then `/task-implement <ISSUE-ID>`.
+   For a bigger effort, `/issues-init <epic>` files a whole linked backlog and
+   `/task-run` builds it in dependency order.
 
 ## Placeholders to fill in
 

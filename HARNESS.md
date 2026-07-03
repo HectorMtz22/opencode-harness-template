@@ -18,13 +18,22 @@ the relevant skill at each stage rather than improvising.
 brainstorm ─▶ spec ─▶ issue(s) ─▶ worktree ─▶ TDD ─▶ verify ─▶ review ─▶ PR
   (skill)    (local)  (tracker)  (gitignored) (R/G/R) (skill)  (skill)
 └─────────── /task-init ──────┘  └──────────── /task-implement ───────────┘
+└────────── /issues-init ──────┘  └───────────────── /task-run ────────────┘
+      (same, but one epic → many        (same, but reads the backlog and
+        linked issues at once)          orders the batches for you)
 ```
 
-Two slash commands drive the loop:
+Four slash commands drive the loop — two for planning, two for building, each
+pair scaling from a single task to a whole epic/backlog:
 
 - **`/task-init [description]`** — brainstorm → local spec → issue(s).
+- **`/issues-init [epic]`** — decompose an epic → many linked issues (blocks
+  relations + a parent grouping), so `/task-run` can order them.
 - **`/task-implement [project_code-12 …]`** — worktree → TDD → verify → review
-  → PR, with parallel agents when there are multiple issues.
+  → PR for the issues you name, with parallel agents when there are multiple.
+- **`/task-run [ids|label]`** — read the backlog, plan a parallel/sequential
+  order from blocks-relations + file-overlap, then drive `/task-implement`'s
+  machinery batch by batch.
 
 Issues live in the tracker (project `project_code`). Specs and plans
 stay *local* and *gitignored* under `docs/superpowers/`; worktrees live under
@@ -193,6 +202,12 @@ For work that splits cleanly, `/task-implement` runs issues concurrently:
 
 Keep agents on **disjoint files** — if two issues touch the same module,
 sequence them instead.
+
+**`/task-run` automates this triage.** Instead of you hand-picking the disjoint
+set, it reads the backlog, derives the batches from the tracker's blocks-relations
++ file-overlap, and runs each batch through steps 2–4 above — parallel where safe,
+sequential where two issues collide. Pair it with `/issues-init`, which files the
+issues already linked so the ordering is explicit.
 
 ---
 
