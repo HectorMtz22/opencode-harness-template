@@ -1,0 +1,35 @@
+# harness-manifest — classifies every harness-managed path into a sync tier.
+#
+# Format: <tier> <path>   (whitespace-separated; blank lines and #-comments
+# are ignored). Consumed by bin/harness (manifest_tier / manifest_paths) and,
+# in a later issue, by /harness-sync.
+#
+# Tiers:
+#   sync    harness-owned; overwritten from the pinned version on a sync pull
+#           (a consumer never edits these).
+#   region  mixed; only the marked HARNESS:BEGIN/END block is replaced, the
+#           project's own content is preserved.
+#   ignore  template-only or project-owned; never synced.
+
+# --- sync: harness-owned, overwritten on pull ---
+sync    .claude/commands/harness-bootstrap.md
+sync    .claude/commands/harness-setup.md
+sync    .claude/commands/issues-init.md
+sync    .claude/commands/task-implement.md
+sync    .claude/commands/task-init.md
+sync    .claude/commands/task-run.md
+sync    HARNESS.md
+sync    AGENTS.md
+sync    .claude/harness-manifest
+sync    bin/harness
+
+# --- region: mixed; only the HARNESS:BEGIN/END block is replaced ---
+region  CLAUDE.md
+region  .gitignore
+
+# --- ignore: template-only or project-owned; never synced ---
+ignore  README.md
+ignore  .claude/commands/harness-release.md
+ignore  VERSION
+ignore  CHANGELOG.md
+ignore  .claude/tracker.md

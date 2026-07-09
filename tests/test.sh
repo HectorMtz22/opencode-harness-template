@@ -220,6 +220,17 @@ assert_ok "cmd_release proceeds when only CHANGELOG is pre-dirty" "$?"
 assert_eq "VERSION bumped 0.1.0 -> 0.1.1" "0.1.1" "$(cat "$REPO3/VERSION")"
 
 # ---------------------------------------------------------------------------
+# The repo's real .claude/harness-manifest is well-formed
+# ---------------------------------------------------------------------------
+REAL_MANIFEST="$ROOT/.claude/harness-manifest"
+manifest_paths "$REAL_MANIFEST" sync >/dev/null 2>&1
+assert_ok "real manifest parses without error" "$?"
+assert_eq "real manifest: bin/harness is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" bin/harness)"
+assert_eq "real manifest: CLAUDE.md is region" "region" "$(manifest_tier "$REAL_MANIFEST" CLAUDE.md)"
+assert_eq "real manifest: README.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" README.md)"
+assert_eq "real manifest: harness-release.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-release.md)"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 printf '\n%s passed, %s failed (%s total)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"

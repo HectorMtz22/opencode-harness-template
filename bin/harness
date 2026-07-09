@@ -110,6 +110,7 @@ manifest_paths() {
   done <<EOF
 $normalized
 EOF
+  return 0
 }
 
 # --- commands --------------------------------------------------------------
