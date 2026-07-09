@@ -22,6 +22,7 @@ sync    HARNESS.md
 sync    AGENTS.md
 sync    .claude/harness-manifest
 sync    bin/harness
+sync    tests/test.sh
 
 # --- region: mixed; only the HARNESS:BEGIN/END block is replaced ---
 region  CLAUDE.md
@@ -33,3 +34,4 @@ ignore  .claude/commands/harness-release.md
 ignore  VERSION
 ignore  CHANGELOG.md
 ignore  .claude/tracker.md
+ignore  LICENSE

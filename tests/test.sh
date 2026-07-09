@@ -238,6 +238,8 @@ assert_eq "real manifest: bin/harness is sync" "sync" "$(manifest_tier "$REAL_MA
 assert_eq "real manifest: CLAUDE.md is region" "region" "$(manifest_tier "$REAL_MANIFEST" CLAUDE.md)"
 assert_eq "real manifest: README.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" README.md)"
 assert_eq "real manifest: harness-release.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-release.md)"
+assert_eq "real manifest: tests/test.sh is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" tests/test.sh)"
+assert_eq "real manifest: LICENSE is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" LICENSE)"
 
 # ---------------------------------------------------------------------------
 # Summary
