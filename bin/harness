@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# harness — versioning + sync helper for the Claude Code harness template.
+#
+# Single dispatcher with subcommands. The pure helper functions below are
+# sourceable (see the guard at the bottom) so tests/test.sh can unit-test them
+# without invoking `main`.
+#
+# Portability: targets macOS system bash 3.2 + BSD tools. No associative
+# arrays, no ${var^^}, no mapfile, no `sort -V`, no GNU-only `sed -i`.
+
+# --- pure helpers (unit-tested via tests/test.sh) --------------------------
+
+# semver_cmp A B -> prints -1 (A<B), 0 (A==B), 1 (A>B).
+# Splits on '.' and compares each field numerically (no `sort -V`, which BSD
+# sort lacks).
+semver_cmp() {
+  local a1 a2 a3 b1 b2 b3
+  IFS=. read -r a1 a2 a3 <<EOF
+$1
+EOF
+  IFS=. read -r b1 b2 b3 <<EOF
+$2
+EOF
+  if [ "$a1" -ne "$b1" ]; then
+    [ "$a1" -lt "$b1" ] && printf '%s\n' -1 || printf '%s\n' 1
+    return 0
+  fi
+  if [ "$a2" -ne "$b2" ]; then
+    [ "$a2" -lt "$b2" ] && printf '%s\n' -1 || printf '%s\n' 1
+    return 0
+  fi
+  if [ "$a3" -ne "$b3" ]; then
+    [ "$a3" -lt "$b3" ] && printf '%s\n' -1 || printf '%s\n' 1
+    return 0
+  fi
+  printf '%s\n' 0
+}
+
+# --- dispatcher ------------------------------------------------------------
+
+main() {
+  local sub="$1"
+  case "$sub" in
+    '' | -h | --help | help)
+      usage
+      return 2
+      ;;
+    *)
+      echo "harness: unknown command: $sub" >&2
+      usage
+      return 2
+      ;;
+  esac
+}
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: harness <command> [args]
+
+commands:
+  release <major|minor|patch>   bump VERSION, roll CHANGELOG.md, commit, tag
+USAGE
+}
+
+# Run main only when executed directly, not when sourced for tests.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  main "$@"
+fi
