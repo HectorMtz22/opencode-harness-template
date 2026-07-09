@@ -36,6 +36,24 @@ EOF
   printf '%s\n' 0
 }
 
+# semver_bump VERSION LEVEL -> prints the bumped version.
+#   major: X+1.0.0   minor: X.Y+1.0   patch: X.Y.Z+1
+semver_bump() {
+  local x y z
+  IFS=. read -r x y z <<EOF
+$1
+EOF
+  case "$2" in
+    major) printf '%s\n' "$((x + 1)).0.0" ;;
+    minor) printf '%s\n' "$x.$((y + 1)).0" ;;
+    patch) printf '%s\n' "$x.$y.$((z + 1))" ;;
+    *)
+      echo "harness: semver_bump: unknown level '$2' (want major|minor|patch)" >&2
+      return 1
+      ;;
+  esac
+}
+
 # --- dispatcher ------------------------------------------------------------
 
 main() {

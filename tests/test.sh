@@ -64,6 +64,17 @@ assert_eq "semver_cmp 0.10.0 0.9.0 -> 1 (numeric, not lexical)" "1" "$(semver_cm
 assert_eq "semver_cmp 1.0.0 1.0.10 -> -1 (numeric, not lexical)" "-1" "$(semver_cmp 1.0.0 1.0.10)"
 
 # ---------------------------------------------------------------------------
+# semver_bump
+# ---------------------------------------------------------------------------
+assert_eq "semver_bump 0.1.0 patch -> 0.1.1" "0.1.1" "$(semver_bump 0.1.0 patch)"
+assert_eq "semver_bump 0.1.0 minor -> 0.2.0" "0.2.0" "$(semver_bump 0.1.0 minor)"
+assert_eq "semver_bump 0.1.0 major -> 1.0.0" "1.0.0" "$(semver_bump 0.1.0 major)"
+assert_eq "semver_bump 1.4.9 minor -> 1.5.0 (resets patch)" "1.5.0" "$(semver_bump 1.4.9 minor)"
+assert_eq "semver_bump 3.7.2 major -> 4.0.0 (resets minor+patch)" "4.0.0" "$(semver_bump 3.7.2 major)"
+semver_bump 1.0.0 bogus >/dev/null 2>&1
+assert_nonzero "semver_bump with unknown level fails" "$?"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 printf '\n%s passed, %s failed (%s total)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"
