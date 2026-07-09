@@ -54,6 +54,64 @@ EOF
   esac
 }
 
+# _manifest_normalize FILE -> prints one "tier path" per real entry.
+# Ignores blank lines and `#` comments (leading whitespace tolerated).
+# Fails (non-zero + stderr) on a malformed line: not exactly `tier path`, or an
+# unknown tier.
+_manifest_normalize() {
+  local file="$1" line
+  if [ ! -f "$file" ]; then
+    echo "harness: manifest not found: $file" >&2
+    return 2
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Word-split collapses surrounding whitespace; $1 is the first token.
+    set -- $line
+    [ "$#" -eq 0 ] && continue
+    case "$1" in \#*) continue ;; esac
+    if [ "$#" -ne 2 ]; then
+      echo "harness: malformed manifest line (want '<tier> <path>'): $line" >&2
+      return 2
+    fi
+    case "$1" in
+      sync | region | ignore) ;;
+      *)
+        echo "harness: unknown tier '$1' in manifest line: $line" >&2
+        return 2
+        ;;
+    esac
+    printf '%s %s\n' "$1" "$2"
+  done < "$file"
+}
+
+# manifest_tier FILE PATH -> prints sync|region|ignore for a listed path.
+# Prints nothing and returns non-zero if the path is not listed.
+manifest_tier() {
+  local target="$2" normalized tier path found=""
+  normalized=$(_manifest_normalize "$1") || return 2
+  while read -r tier path; do
+    [ "$path" = "$target" ] && found="$tier"
+  done <<EOF
+$normalized
+EOF
+  if [ -n "$found" ]; then
+    printf '%s\n' "$found"
+    return 0
+  fi
+  return 1
+}
+
+# manifest_paths FILE TIER -> prints the paths of that tier, one per line.
+manifest_paths() {
+  local want="$2" normalized tier path
+  normalized=$(_manifest_normalize "$1") || return 2
+  while read -r tier path; do
+    [ "$tier" = "$want" ] && printf '%s\n' "$path"
+  done <<EOF
+$normalized
+EOF
+}
+
 # --- dispatcher ------------------------------------------------------------
 
 main() {
