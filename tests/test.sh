@@ -219,6 +219,15 @@ printf '\n- Pending tweak.\n' >> "$REPO3/CHANGELOG.md"
 assert_ok "cmd_release proceeds when only CHANGELOG is pre-dirty" "$?"
 assert_eq "VERSION bumped 0.1.0 -> 0.1.1" "0.1.1" "$(cat "$REPO3/VERSION")"
 
+# --- refuses to re-release an existing tag, leaving NO partial commit ---
+REPO4=$(setup_release_repo)
+git -C "$REPO4" tag v0.2.0                       # tag for the next minor already exists
+before_head=$(git -C "$REPO4" rev-parse HEAD)
+(cd "$REPO4" && HARNESS_RELEASE_DATE=2026-07-08 cmd_release minor) >/dev/null 2>&1
+assert_nonzero "cmd_release refuses when tag v0.2.0 already exists" "$?"
+assert_eq "VERSION untouched after tag-exists refusal" "0.1.0" "$(cat "$REPO4/VERSION")"
+assert_eq "no partial release commit after tag-exists refusal" "$before_head" "$(git -C "$REPO4" rev-parse HEAD)"
+
 # ---------------------------------------------------------------------------
 # The repo's real .claude/harness-manifest is well-formed
 # ---------------------------------------------------------------------------

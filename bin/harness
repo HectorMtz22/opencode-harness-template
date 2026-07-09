@@ -154,6 +154,13 @@ cmd_release() {
     return 1
   fi
 
+  # Refuse before mutating if the tag already exists — otherwise the commit
+  # below would land with no tag, a partial release needing a manual reset.
+  if git -C "$root" rev-parse -q --verify "refs/tags/v$new" >/dev/null 2>&1; then
+    echo "harness: tag v$new already exists — refusing to re-release" >&2
+    return 1
+  fi
+
   # Bump VERSION.
   printf '%s\n' "$new" > "$root/VERSION"
 
