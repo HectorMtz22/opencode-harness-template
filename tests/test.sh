@@ -239,7 +239,289 @@ assert_eq "real manifest: CLAUDE.md is region" "region" "$(manifest_tier "$REAL_
 assert_eq "real manifest: README.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" README.md)"
 assert_eq "real manifest: harness-release.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-release.md)"
 assert_eq "real manifest: tests/test.sh is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" tests/test.sh)"
+assert_eq "real manifest: harness-sync.md is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-sync.md)"
+assert_eq "real manifest: harness.lock is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/harness.lock)"
 assert_eq "real manifest: LICENSE is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" LICENSE)"
+
+# ---------------------------------------------------------------------------
+# region_splice — replace only the marked block, preserve the rest
+# ---------------------------------------------------------------------------
+RB='<!-- HARNESS:BEGIN -->'
+RE='<!-- HARNESS:END -->'
+
+SPLICE_FILE=$(mktmp)
+cat > "$SPLICE_FILE" <<EOF
+project intro line
+$RB
+old harness line 1
+old harness line 2
+$RE
+project outro line
+EOF
+
+NEWC=$(mktmp)
+cat > "$NEWC" <<'EOF'
+new harness line A
+new harness line B
+EOF
+
+region_splice "$SPLICE_FILE" "$RB" "$RE" "$NEWC"
+assert_ok "region_splice exits 0 on a well-formed file" "$?"
+grep -q '^project intro line$' "$SPLICE_FILE"
+assert_ok "region_splice preserves text before the block" "$?"
+grep -q '^project outro line$' "$SPLICE_FILE"
+assert_ok "region_splice preserves text after the block" "$?"
+grep -q '^new harness line B$' "$SPLICE_FILE"
+assert_ok "region_splice inserts the new content" "$?"
+grep -q 'old harness line' "$SPLICE_FILE"
+assert_nonzero "region_splice drops the old block content" "$?"
+assert_eq "region_splice keeps exactly one BEGIN marker" "1" "$(grep -cxF "$RB" "$SPLICE_FILE")"
+assert_eq "region_splice keeps exactly one END marker" "1" "$(grep -cxF "$RE" "$SPLICE_FILE")"
+
+# --- error: markers missing, file untouched ---
+NOMARK=$(mktmp)
+printf 'just a normal file\nno markers here\n' > "$NOMARK"
+NOMARK_BEFORE=$(cat "$NOMARK")
+region_splice "$NOMARK" "$RB" "$RE" "$NEWC" >/dev/null 2>&1
+assert_nonzero "region_splice fails when markers are missing" "$?"
+assert_eq "region_splice leaves file unchanged when markers missing" "$NOMARK_BEFORE" "$(cat "$NOMARK")"
+
+# --- error: unbalanced (BEGIN without END), file untouched ---
+UNBAL=$(mktmp)
+printf 'intro\n%s\nblock\n' "$RB" > "$UNBAL"
+UNBAL_BEFORE=$(cat "$UNBAL")
+region_splice "$UNBAL" "$RB" "$RE" "$NEWC" >/dev/null 2>&1
+assert_nonzero "region_splice fails when END marker is missing (unbalanced)" "$?"
+assert_eq "region_splice leaves file unchanged when unbalanced" "$UNBAL_BEFORE" "$(cat "$UNBAL")"
+
+# ---------------------------------------------------------------------------
+# lock_read / lock_write — consumer-side synced state round-trip
+# ---------------------------------------------------------------------------
+LOCK=$(mktmp)
+lock_write "$LOCK" 0.3.0 abc123def harness
+assert_ok "lock_write exits 0" "$?"
+assert_eq "lock round-trip: version" "0.3.0" "$(lock_read "$LOCK" version)"
+assert_eq "lock round-trip: commit" "abc123def" "$(lock_read "$LOCK" commit)"
+assert_eq "lock round-trip: remote" "harness" "$(lock_read "$LOCK" remote)"
+
+lock_read "$LOCK" nope >/dev/null 2>&1
+assert_nonzero "lock_read on an absent key returns non-zero" "$?"
+lock_read "${LOCK}.does-not-exist" version >/dev/null 2>&1
+assert_nonzero "lock_read on a missing file returns non-zero" "$?"
+
+# ---------------------------------------------------------------------------
+# _max_semver — highest X.Y.Z from stdin, ignoring non-semver lines
+# ---------------------------------------------------------------------------
+assert_eq "_max_semver picks the highest (numeric, not lexical)" "0.10.0" \
+  "$(printf '0.2.0\n0.10.0\n0.9.0\n' | _max_semver)"
+assert_eq "_max_semver ignores non-semver lines" "1.0.0" \
+  "$(printf 'garbage\nv1.0.0\n1.0.0\n0.9.9\n' | _max_semver)"
+assert_eq "_max_semver with a single version" "2.3.4" "$(printf '2.3.4\n' | _max_semver)"
+printf 'nope\n\n' | _max_semver >/dev/null 2>&1
+assert_nonzero "_max_semver fails when no valid version present" "$?"
+
+# ---------------------------------------------------------------------------
+# region_extract — the lines strictly between the markers (exclusive)
+# ---------------------------------------------------------------------------
+EXTRACT_FILE=$(mktmp)
+cat > "$EXTRACT_FILE" <<EOF
+before
+$RB
+line one
+line two
+$RE
+after
+EOF
+exp_block=$(printf '%s\n' 'line one' 'line two')
+assert_eq "region_extract returns only the block content" "$exp_block" \
+  "$(region_extract "$EXTRACT_FILE" "$RB" "$RE")"
+
+# ---------------------------------------------------------------------------
+# cmd_sync_plan / cmd_sync_pull (exercised against fixture upstream+consumer)
+# ---------------------------------------------------------------------------
+# Builds an "upstream" (template) repo tagged v0.2.0 and a "consumer" repo that
+# has the upstream added as remote 'harness', older managed files, and a lock at
+# 0.1.0. Echoes "<upstream>|<consumer>".
+setup_sync_fixture() {
+  local up con
+  up=$(mktmpdir)
+  con=$(mktmpdir)
+
+  git -C "$up" init -q
+  git -C "$up" config user.email t@e.com
+  git -C "$up" config user.name T
+  git -C "$up" config commit.gpgsign false
+  mkdir -p "$up/.claude"
+  cat > "$up/.claude/harness-manifest" <<'EOF'
+sync   HARNESS.md
+region CLAUDE.md
+ignore README.md
+EOF
+  printf 'UPSTREAM HARNESS v0.2.0\n' > "$up/HARNESS.md"
+  cat > "$up/CLAUDE.md" <<EOF
+# upstream heading (not synced)
+$RB
+upstream managed block v0.2.0
+$RE
+EOF
+  printf '0.2.0\n' > "$up/VERSION"
+  git -C "$up" add -A
+  git -C "$up" commit -q -m "upstream v0.2.0"
+  git -C "$up" tag v0.2.0
+
+  git -C "$con" init -q
+  git -C "$con" config user.email t@e.com
+  git -C "$con" config user.name T
+  git -C "$con" config commit.gpgsign false
+  git -C "$con" remote add harness "$up"
+  mkdir -p "$con/.claude"
+  printf 'sync HARNESS.md\n' > "$con/.claude/harness-manifest"
+  printf 'old consumer harness\n' > "$con/HARNESS.md"
+  cat > "$con/CLAUDE.md" <<EOF
+# My Project
+project-owned intro line
+$RB
+stale managed block
+$RE
+project-owned outro line
+EOF
+  lock_write "$con/.claude/harness.lock" 0.1.0 deadbeef harness
+  git -C "$con" add -A
+  git -C "$con" commit -q -m "consumer baseline"
+
+  printf '%s|%s' "$up" "$con"
+}
+
+# --- sync plan: dry run, reports overwrites/splices/version delta, no writes ---
+FIX=$(setup_sync_fixture)
+CON=${FIX#*|}
+plan_out=$( (cd "$CON" && cmd_sync_plan) 2>&1 )
+assert_ok "cmd_sync_plan exits 0" "$?"
+printf '%s\n' "$plan_out" | grep -q '0.1.0 -> 0.2.0'
+assert_ok "sync plan reports the version delta 0.1.0 -> 0.2.0" "$?"
+printf '%s\n' "$plan_out" | grep -Eq '^overwrite[[:space:]]+HARNESS.md$'
+assert_ok "sync plan lists HARNESS.md as an overwrite" "$?"
+printf '%s\n' "$plan_out" | grep -Eq '^splice[[:space:]]+CLAUDE.md$'
+assert_ok "sync plan lists CLAUDE.md as a splice" "$?"
+assert_eq "sync plan writes nothing (clean tree)" "" "$(git -C "$CON" status --porcelain)"
+assert_eq "sync plan leaves HARNESS.md untouched" "old consumer harness" "$(cat "$CON/HARNESS.md")"
+
+# --- sync pull: applies overwrites + splices, writes lock, preserves project text ---
+FIX2=$(setup_sync_fixture)
+UP2=${FIX2%%|*}
+CON2=${FIX2#*|}
+(cd "$CON2" && cmd_sync_pull) >/dev/null 2>&1
+assert_ok "cmd_sync_pull exits 0" "$?"
+assert_eq "pull overwrites the sync file from upstream" "UPSTREAM HARNESS v0.2.0" "$(cat "$CON2/HARNESS.md")"
+grep -q '^upstream managed block v0.2.0$' "$CON2/CLAUDE.md"
+assert_ok "pull splices the upstream managed block into CLAUDE.md" "$?"
+grep -q '^project-owned intro line$' "$CON2/CLAUDE.md"
+assert_ok "pull preserves the project-owned line before the region" "$?"
+grep -q '^project-owned outro line$' "$CON2/CLAUDE.md"
+assert_ok "pull preserves the project-owned line after the region" "$?"
+grep -q 'stale managed block' "$CON2/CLAUDE.md"
+assert_nonzero "pull replaces the stale managed block" "$?"
+assert_eq "pull updates the lock version" "0.2.0" "$(lock_read "$CON2/.claude/harness.lock" version)"
+assert_eq "pull records the upstream tag commit in the lock" \
+  "$(git -C "$UP2" rev-parse v0.2.0^{commit})" "$(lock_read "$CON2/.claude/harness.lock" commit)"
+
+# --- sync pull refuses on a dirty tree ---
+FIX3=$(setup_sync_fixture)
+CON3=${FIX3#*|}
+printf 'uncommitted edit\n' >> "$CON3/HARNESS.md"
+(cd "$CON3" && cmd_sync_pull) >/dev/null 2>&1
+assert_nonzero "cmd_sync_pull refuses on a dirty tree" "$?"
+
+# --- sync pull must not truncate a local file when its sync path is absent at
+#     the tag (a malformed tag/manifest must not cause silent data loss) ---
+GUP=$(mktmpdir)
+GCON=$(mktmpdir)
+git -C "$GUP" init -q
+git -C "$GUP" config user.email t@e.com
+git -C "$GUP" config user.name T
+git -C "$GUP" config commit.gpgsign false
+mkdir -p "$GUP/.claude"
+cat > "$GUP/.claude/harness-manifest" <<'EOF'
+sync HARNESS.md
+sync GHOST.md
+EOF
+printf 'UPSTREAM HARNESS\n' > "$GUP/HARNESS.md"   # GHOST.md deliberately absent
+git -C "$GUP" add -A
+git -C "$GUP" commit -q -m up
+git -C "$GUP" tag v0.2.0
+
+git -C "$GCON" init -q
+git -C "$GCON" config user.email t@e.com
+git -C "$GCON" config user.name T
+git -C "$GCON" config commit.gpgsign false
+git -C "$GCON" remote add harness "$GUP"
+mkdir -p "$GCON/.claude"
+printf 'sync HARNESS.md\n' > "$GCON/.claude/harness-manifest"
+printf 'old harness\n' > "$GCON/HARNESS.md"
+printf 'PRECIOUS local content\n' > "$GCON/GHOST.md"
+git -C "$GCON" add -A
+git -C "$GCON" commit -q -m con
+
+(cd "$GCON" && cmd_sync_pull) >/dev/null 2>&1
+assert_eq "pull overwrites the present sync file" "UPSTREAM HARNESS" "$(cat "$GCON/HARNESS.md")"
+assert_eq "pull preserves a local file when its sync path is missing at the tag" \
+  "PRECIOUS local content" "$(cat "$GCON/GHOST.md")"
+
+# ---------------------------------------------------------------------------
+# cmd_sync_push — branch + commit managed diffs, hand off to gh (seam stubbed)
+# ---------------------------------------------------------------------------
+# _open_pr, when gh is unavailable, prints the manual command and still succeeds.
+op_out=$(HARNESS_ASSUME_NO_GH=1 _open_pr /some/root harness-sync/x 2>&1)
+assert_ok "_open_pr returns 0 when gh is unavailable" "$?"
+printf '%s\n' "$op_out" | grep -q 'gh pr create'
+assert_ok "_open_pr prints the manual gh command when gh is unavailable" "$?"
+
+setup_push_repo() {
+  local con
+  con=$(mktmpdir)
+  git -C "$con" init -q
+  git -C "$con" config user.email t@e.com
+  git -C "$con" config user.name T
+  git -C "$con" config commit.gpgsign false
+  mkdir -p "$con/.claude"
+  cat > "$con/.claude/harness-manifest" <<'EOF'
+sync   HARNESS.md
+ignore README.md
+EOF
+  printf 'harness content\n' > "$con/HARNESS.md"
+  printf 'project readme\n' > "$con/README.md"
+  git -C "$con" add -A
+  git -C "$con" commit -q -m "baseline"
+  printf '%s' "$con"
+}
+
+# --- happy path: managed change → branch + commit + PR seam invoked ---
+PUSH=$(setup_push_repo)
+printf 'local harness improvement\n' >> "$PUSH/HARNESS.md"
+printf 'local readme edit\n' >> "$PUSH/README.md"
+PR_MARKER=$(mktmp)
+_open_pr() { printf 'opened:%s' "$2" > "$PR_MARKER"; }   # stub the gh boundary
+(cd "$PUSH" && cmd_sync_push my-topic) >/dev/null 2>&1
+assert_ok "cmd_sync_push exits 0 with a managed change" "$?"
+assert_eq "push checks out branch harness-sync/my-topic" "harness-sync/my-topic" \
+  "$(git -C "$PUSH" rev-parse --abbrev-ref HEAD)"
+assert_eq "push commit subject" "chore(harness): sync push — my-topic" \
+  "$(git -C "$PUSH" log -1 --pretty=%s)"
+git -C "$PUSH" show HEAD:HARNESS.md | grep -q 'local harness improvement'
+assert_ok "push commits the managed file change" "$?"
+git -C "$PUSH" status --porcelain | grep -q 'README.md'
+assert_ok "push leaves the unmanaged file uncommitted" "$?"
+assert_eq "push invokes PR creation with the branch" "opened:harness-sync/my-topic" "$(cat "$PR_MARKER")"
+
+# --- no managed change → refuse, no branch created ---
+PUSH2=$(setup_push_repo)
+printf 'only an unmanaged edit\n' >> "$PUSH2/README.md"
+_open_pr() { :; }
+(cd "$PUSH2" && cmd_sync_push empty-topic) >/dev/null 2>&1
+assert_nonzero "cmd_sync_push refuses when no managed file changed" "$?"
+push2_branch=$(git -C "$PUSH2" rev-parse --abbrev-ref HEAD)
+if [ "$push2_branch" = "harness-sync/empty-topic" ]; then push2_branched=yes; else push2_branched=no; fi
+assert_eq "push does not create a branch when there is nothing to push" "no" "$push2_branched"
 
 # ---------------------------------------------------------------------------
 # Summary

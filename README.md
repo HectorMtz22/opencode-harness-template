@@ -26,6 +26,10 @@ can drive a change end-to-end without improvising the process. A planning pair
 | [`.claude/commands/task-run.md`](.claude/commands/task-run.md) | `/task-run` — read the backlog, order it (relations + file-overlap), drive `/task-implement` batch by batch. |
 | [`.claude/commands/harness-setup.md`](.claude/commands/harness-setup.md) | `/harness-setup` — choose tracker, write `.claude/tracker.md` (offline). |
 | [`.claude/commands/harness-bootstrap.md`](.claude/commands/harness-bootstrap.md) | `/harness-bootstrap` — create project, states, labels, and weekly cycles in the live tracker (idempotent). |
+| [`.claude/commands/harness-sync.md`](.claude/commands/harness-sync.md) | `/harness-sync` — pull harness updates in, or push local harness changes back as a PR. |
+| [`.claude/commands/harness-release.md`](.claude/commands/harness-release.md) | `/harness-release` — cut a version (template repo only). |
+| [`bin/harness`](bin/harness) | Tested bash helper behind `/harness-release` + `/harness-sync` (semver, manifest, region splice, lock). |
+| [`.claude/harness-manifest`](.claude/harness-manifest) | Classifies every path into a sync tier: `sync` / `region` / `ignore`. |
 | [`.claude/tracker.md`](.claude/tracker.md) | Tracker config (single source of truth). Written by `/harness-setup`. |
 | [`.gitignore`](.gitignore) | Ignores the local-only spec workspace and agent worktrees. |
 
@@ -56,6 +60,29 @@ brainstorm ─▶ spec ─▶ issue(s) ─▶ worktree ─▶ TDD ─▶ verify 
 5. Run `/task-init <idea>` to start a task, then `/task-implement <ISSUE-ID>`.
    For a bigger effort, `/issues-init <epic>` files a whole linked backlog and
    `/task-run` builds it in dependency order.
+
+## Staying in sync with the template
+
+The harness is versioned, so a repo that adopted it can keep up to date — and
+send improvements back — instead of copy-pasting files.
+
+- **Versions.** This template carries a [`VERSION`](VERSION) (semver) and a
+  [`CHANGELOG.md`](CHANGELOG.md). The maintainer cuts a release with
+  `/harness-release <major|minor|patch>`, which tags `vX.Y.Z`.
+- **What's managed.** [`.claude/harness-manifest`](.claude/harness-manifest)
+  sorts every path into a tier: `sync` (harness-owned — replaced wholesale on a
+  pull), `region` (mixed — only the `HARNESS:BEGIN…END` block is replaced, your
+  project content is kept), or `ignore` (never synced).
+- **Pull updates** into a consumer with `/harness-sync` (needs the template
+  added as a git remote named `harness`). It plans first (a dry run of every
+  overwrite/splice + the version delta), then, on approval, applies and records
+  the synced state in `.claude/harness.lock`.
+- **Push a local harness fix back** with `/harness-sync push <topic>` — it
+  branches, commits just the managed files, and opens a PR against the template.
+
+Everything risky (semver math, manifest parsing, region splicing, lock I/O)
+lives in the tested [`bin/harness`](bin/harness) helper; the commands are thin
+orchestrators.
 
 ## Placeholders to fill in
 

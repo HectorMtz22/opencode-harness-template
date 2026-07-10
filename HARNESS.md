@@ -211,6 +211,34 @@ issues already linked so the ordering is explicit.
 
 ---
 
+## Versioning & sync
+
+The harness is itself versioned so a repo that adopted it can track upstream
+changes. The mechanics live in the tested `bin/harness` helper; two thin
+commands drive it.
+
+- **Cut a version (template repo only)** — `/harness-release <major|minor|patch>`
+  bumps `VERSION`, rolls the `CHANGELOG.md` **Unreleased** section into a dated
+  heading, commits, and tags `vX.Y.Z`.
+- **The manifest** — `.claude/harness-manifest` classifies every path:
+  - `sync` — harness-owned; **overwritten** wholesale on a pull.
+  - `region` — mixed; only the `HARNESS:BEGIN…END` block is replaced, so your
+    project content (the `CLAUDE.md` project table, extra `.gitignore` lines)
+    survives.
+  - `ignore` — template-only or project-owned; never synced.
+- **Pull updates into a consumer** — `/harness-sync` (needs the template as a
+  git remote named `harness`). Always **plan first** (`bin/harness sync plan` —
+  a read-only dry run of every overwrite/splice + the version delta), show the
+  user, then `pull`. Pull refuses on a dirty tree and records the synced
+  `version`/`commit`/`remote` in `.claude/harness.lock` (commit that file).
+- **Push a local harness fix back** — `/harness-sync push <topic>` branches,
+  commits **only** the managed files, and opens a PR against the template (falls
+  back to printing the manual `gh` command if `gh` is absent).
+
+`sync`-tier files are overwritten rather than 3-way merged (a consumer never
+edits them — that's what push is for). Never hand-edit inside a region's
+markers; a pull replaces that block.
+
 ## Guardrails
 
 - **Issues in the tracker; specs/plans local.** `docs/superpowers/` and

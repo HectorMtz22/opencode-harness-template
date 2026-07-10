@@ -14,6 +14,7 @@
 # --- sync: harness-owned, overwritten on pull ---
 sync    .claude/commands/harness-bootstrap.md
 sync    .claude/commands/harness-setup.md
+sync    .claude/commands/harness-sync.md
 sync    .claude/commands/issues-init.md
 sync    .claude/commands/task-implement.md
 sync    .claude/commands/task-init.md
@@ -34,4 +35,5 @@ ignore  .claude/commands/harness-release.md
 ignore  VERSION
 ignore  CHANGELOG.md
 ignore  .claude/tracker.md
+ignore  .claude/harness.lock
 ignore  LICENSE
