@@ -431,6 +431,71 @@ cmd_sync_pull() {
   echo "Pulled harness v$ver from '$remote'"
 }
 
+# cmd_sync_push TOPIC -> if any managed (sync/region) file has local changes,
+# branch `harness-sync/<topic>`, commit just those files, and hand off to gh.
+# Refuses (without branching) if nothing managed changed.
+cmd_sync_push() {
+  local topic="$1" root manifest managed branch p changed=""
+  if [ -z "$topic" ]; then
+    echo "usage: harness sync push <topic>" >&2
+    return 2
+  fi
+  root=$(_sync_root) || { echo "harness: not inside a git repository" >&2; return 1; }
+  manifest="$root/.claude/harness-manifest"
+  if [ ! -f "$manifest" ]; then
+    echo "harness: manifest not found: $manifest" >&2
+    return 1
+  fi
+
+  managed=$( { manifest_paths "$manifest" sync; manifest_paths "$manifest" region; } )
+
+  for p in $managed; do
+    [ -n "$p" ] || continue
+    if ! git -C "$root" diff --quiet -- "$p" 2>/dev/null \
+      || ! git -C "$root" diff --cached --quiet -- "$p" 2>/dev/null; then
+      changed="yes"
+    fi
+  done
+  if [ -z "$changed" ]; then
+    echo "harness: no managed changes to push" >&2
+    return 1
+  fi
+
+  branch="harness-sync/$topic"
+  git -C "$root" checkout -q -b "$branch" || {
+    echo "harness: could not create branch $branch" >&2
+    return 1
+  }
+
+  for p in $managed; do
+    [ -n "$p" ] || continue
+    [ -e "$root/$p" ] && git -C "$root" add -- "$p"
+  done
+
+  git -C "$root" commit -q -m "chore(harness): sync push — $topic" || {
+    echo "harness: commit failed" >&2
+    return 1
+  }
+
+  _open_pr "$root" "$branch"
+}
+
+# _open_pr ROOT BRANCH -> push the branch to origin and open a PR against the
+# template with gh. If gh is unavailable (or $HARNESS_ASSUME_NO_GH is set),
+# print the manual commands and succeed — the branch/commit already exist.
+_open_pr() {
+  local root="$1" branch="$2"
+  if command -v gh >/dev/null 2>&1 && [ -z "$HARNESS_ASSUME_NO_GH" ]; then
+    git -C "$root" push -q -u origin "$branch" \
+      && gh pr create --repo "$HARNESS_UPSTREAM_REPO" --head "$branch" --fill
+  else
+    echo "harness: gh not available — open the PR manually:" >&2
+    echo "  git -C \"$root\" push -u origin $branch" >&2
+    echo "  gh pr create --repo $HARNESS_UPSTREAM_REPO --head $branch --fill" >&2
+    return 0
+  fi
+}
+
 # --- dispatcher ------------------------------------------------------------
 
 main() {
@@ -448,8 +513,22 @@ main() {
       esac
       cmd_release "$level"
       ;;
-    # A `sync` subcommand (plan/pull/push) is added by a later issue; new
-    # subcommands slot in as additional cases here.
+    sync)
+      shift
+      local dir="$1"
+      case "$dir" in
+        plan) cmd_sync_plan ;;
+        pull) cmd_sync_pull ;;
+        push)
+          shift
+          cmd_sync_push "$1"
+          ;;
+        *)
+          echo "usage: harness sync <plan|pull|push [topic]>" >&2
+          return 2
+          ;;
+      esac
+      ;;
     '' | -h | --help | help)
       usage
       return 2
@@ -468,6 +547,9 @@ usage: harness <command> [args]
 
 commands:
   release <major|minor|patch>   bump VERSION, roll CHANGELOG.md, commit, tag
+  sync plan                     dry-run: show what a pull would change
+  sync pull                     apply upstream harness updates (overwrite+splice)
+  sync push <topic>             PR local harness changes back to the template
 USAGE
 }
 

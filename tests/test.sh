@@ -431,6 +431,62 @@ printf 'uncommitted edit\n' >> "$CON3/HARNESS.md"
 assert_nonzero "cmd_sync_pull refuses on a dirty tree" "$?"
 
 # ---------------------------------------------------------------------------
+# cmd_sync_push — branch + commit managed diffs, hand off to gh (seam stubbed)
+# ---------------------------------------------------------------------------
+# _open_pr, when gh is unavailable, prints the manual command and still succeeds.
+op_out=$(HARNESS_ASSUME_NO_GH=1 _open_pr /some/root harness-sync/x 2>&1)
+assert_ok "_open_pr returns 0 when gh is unavailable" "$?"
+printf '%s\n' "$op_out" | grep -q 'gh pr create'
+assert_ok "_open_pr prints the manual gh command when gh is unavailable" "$?"
+
+setup_push_repo() {
+  local con
+  con=$(mktmpdir)
+  git -C "$con" init -q
+  git -C "$con" config user.email t@e.com
+  git -C "$con" config user.name T
+  git -C "$con" config commit.gpgsign false
+  mkdir -p "$con/.claude"
+  cat > "$con/.claude/harness-manifest" <<'EOF'
+sync   HARNESS.md
+ignore README.md
+EOF
+  printf 'harness content\n' > "$con/HARNESS.md"
+  printf 'project readme\n' > "$con/README.md"
+  git -C "$con" add -A
+  git -C "$con" commit -q -m "baseline"
+  printf '%s' "$con"
+}
+
+# --- happy path: managed change → branch + commit + PR seam invoked ---
+PUSH=$(setup_push_repo)
+printf 'local harness improvement\n' >> "$PUSH/HARNESS.md"
+printf 'local readme edit\n' >> "$PUSH/README.md"
+PR_MARKER=$(mktmp)
+_open_pr() { printf 'opened:%s' "$2" > "$PR_MARKER"; }   # stub the gh boundary
+(cd "$PUSH" && cmd_sync_push my-topic) >/dev/null 2>&1
+assert_ok "cmd_sync_push exits 0 with a managed change" "$?"
+assert_eq "push checks out branch harness-sync/my-topic" "harness-sync/my-topic" \
+  "$(git -C "$PUSH" rev-parse --abbrev-ref HEAD)"
+assert_eq "push commit subject" "chore(harness): sync push — my-topic" \
+  "$(git -C "$PUSH" log -1 --pretty=%s)"
+git -C "$PUSH" show HEAD:HARNESS.md | grep -q 'local harness improvement'
+assert_ok "push commits the managed file change" "$?"
+git -C "$PUSH" status --porcelain | grep -q 'README.md'
+assert_ok "push leaves the unmanaged file uncommitted" "$?"
+assert_eq "push invokes PR creation with the branch" "opened:harness-sync/my-topic" "$(cat "$PR_MARKER")"
+
+# --- no managed change → refuse, no branch created ---
+PUSH2=$(setup_push_repo)
+printf 'only an unmanaged edit\n' >> "$PUSH2/README.md"
+_open_pr() { :; }
+(cd "$PUSH2" && cmd_sync_push empty-topic) >/dev/null 2>&1
+assert_nonzero "cmd_sync_push refuses when no managed file changed" "$?"
+push2_branch=$(git -C "$PUSH2" rev-parse --abbrev-ref HEAD)
+if [ "$push2_branch" = "harness-sync/empty-topic" ]; then push2_branched=yes; else push2_branched=no; fi
+assert_eq "push does not create a branch when there is nothing to push" "no" "$push2_branched"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 printf '\n%s passed, %s failed (%s total)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"
