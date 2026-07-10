@@ -10,6 +10,22 @@ rolls the **Unreleased** section below into a dated version heading and tags
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-10
+
+### Added
+
+- `/harness-sync` and `bin/harness sync plan|pull|push`: keep a consumer's copy
+  of the harness in step with this template over a git remote named `harness`.
+  `pull` overwrites `sync`-tier files from the latest `vX.Y.Z` tag and splices
+  only the `HARNESS:BEGIN…END` block of `region`-tier files (preserving project
+  content); `push` branches, commits the managed files, and opens a PR upstream.
+- `.claude/harness.lock` recording a consumer's synced `version`/`commit`/`remote`.
+- Region markers around the harness-managed blocks of `CLAUDE.md` and
+  `.gitignore`, plus `harness-sync.md` added to the manifest (`sync` tier).
+- Tested helpers behind sync: `region_splice`/`region_extract`, lock read/write,
+  and latest-tag resolution (fetched into a private `refs/harness-remote/*`
+  namespace so consumer tags never collide).
+
 ## [0.1.0] - 2026-07-08
 
 ### Added
