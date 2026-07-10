@@ -432,6 +432,41 @@ printf 'uncommitted edit\n' >> "$CON3/HARNESS.md"
 (cd "$CON3" && cmd_sync_pull) >/dev/null 2>&1
 assert_nonzero "cmd_sync_pull refuses on a dirty tree" "$?"
 
+# --- sync pull must not truncate a local file when its sync path is absent at
+#     the tag (a malformed tag/manifest must not cause silent data loss) ---
+GUP=$(mktmpdir)
+GCON=$(mktmpdir)
+git -C "$GUP" init -q
+git -C "$GUP" config user.email t@e.com
+git -C "$GUP" config user.name T
+git -C "$GUP" config commit.gpgsign false
+mkdir -p "$GUP/.claude"
+cat > "$GUP/.claude/harness-manifest" <<'EOF'
+sync HARNESS.md
+sync GHOST.md
+EOF
+printf 'UPSTREAM HARNESS\n' > "$GUP/HARNESS.md"   # GHOST.md deliberately absent
+git -C "$GUP" add -A
+git -C "$GUP" commit -q -m up
+git -C "$GUP" tag v0.2.0
+
+git -C "$GCON" init -q
+git -C "$GCON" config user.email t@e.com
+git -C "$GCON" config user.name T
+git -C "$GCON" config commit.gpgsign false
+git -C "$GCON" remote add harness "$GUP"
+mkdir -p "$GCON/.claude"
+printf 'sync HARNESS.md\n' > "$GCON/.claude/harness-manifest"
+printf 'old harness\n' > "$GCON/HARNESS.md"
+printf 'PRECIOUS local content\n' > "$GCON/GHOST.md"
+git -C "$GCON" add -A
+git -C "$GCON" commit -q -m con
+
+(cd "$GCON" && cmd_sync_pull) >/dev/null 2>&1
+assert_eq "pull overwrites the present sync file" "UPSTREAM HARNESS" "$(cat "$GCON/HARNESS.md")"
+assert_eq "pull preserves a local file when its sync path is missing at the tag" \
+  "PRECIOUS local content" "$(cat "$GCON/GHOST.md")"
+
 # ---------------------------------------------------------------------------
 # cmd_sync_push — branch + commit managed diffs, hand off to gh (seam stubbed)
 # ---------------------------------------------------------------------------

@@ -370,7 +370,7 @@ cmd_sync_plan() {
 # tag, splice region-tier blocks (preserving project content), and rewrite the
 # lock. Refuses on a dirty tree.
 cmd_sync_pull() {
-  local remote root ver ref manifest_tmp dirty p mb me tmpl blk sha
+  local remote root ver ref manifest_tmp dirty p mb me tmpl blk sha stmp
   remote="${HARNESS_REMOTE:-harness}"
   root=$(_sync_root) || { echo "harness: not inside a git repository" >&2; return 1; }
 
@@ -395,12 +395,19 @@ cmd_sync_pull() {
     return 1
   fi
 
-  # sync tier: overwrite wholesale from the tag.
+  # sync tier: overwrite wholesale from the tag. Write to a temp file first and
+  # mv into place only on success, so a path missing at the tag can't truncate
+  # the consumer's existing file.
   manifest_paths "$manifest_tmp" sync | while IFS= read -r p; do
     [ -n "$p" ] || continue
-    mkdir -p "$(dirname "$root/$p")"
-    git -C "$root" show "$ref:$p" > "$root/$p" 2>/dev/null \
-      || echo "harness: warning: $p missing at $ref, skipped" >&2
+    stmp=$(mktemp "${TMPDIR:-/tmp}/harness-sync.XXXXXX")
+    if git -C "$root" show "$ref:$p" > "$stmp" 2>/dev/null; then
+      mkdir -p "$(dirname "$root/$p")"
+      mv "$stmp" "$root/$p"
+    else
+      echo "harness: warning: $p missing at $ref, skipped" >&2
+      rm -f "$stmp"
+    fi
   done
 
   # region tier: replace only the marked block, keeping project content.
