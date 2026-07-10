@@ -239,6 +239,8 @@ assert_eq "real manifest: CLAUDE.md is region" "region" "$(manifest_tier "$REAL_
 assert_eq "real manifest: README.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" README.md)"
 assert_eq "real manifest: harness-release.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-release.md)"
 assert_eq "real manifest: tests/test.sh is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" tests/test.sh)"
+assert_eq "real manifest: harness-sync.md is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-sync.md)"
+assert_eq "real manifest: harness.lock is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/harness.lock)"
 assert_eq "real manifest: LICENSE is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" LICENSE)"
 
 # ---------------------------------------------------------------------------

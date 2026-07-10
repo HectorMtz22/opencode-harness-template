@@ -111,11 +111,31 @@ refactor. Subagents dispatched for non-trivial work should be told to
 red/green/refactor and to include the failing-test commit in the diff (or at
 minimum show the failing run in their report).
 
+## Versioning & sync
+
+The harness is versioned so a consumer can track the upstream template. It's
+driven by the tested `bin/harness` helper behind two thin commands:
+`/harness-release` (template-only — bump `VERSION`/`CHANGELOG.md`, tag `vX.Y.Z`)
+and `/harness-sync` (in a consumer — `plan`/`pull`/`push`).
+
+`.claude/harness-manifest` tiers every path: `sync` (overwritten on pull),
+`region` (only the `HARNESS:BEGIN…END` block is replaced, project content kept),
+`ignore` (never synced). A pull refuses on a dirty tree and writes the synced
+state to `.claude/harness.lock`; a push branches, commits only the managed
+files, and opens a PR upstream. **Plan before every pull** and show the user.
+Don't reimplement any of this in the markdown commands — the mechanics (semver,
+manifest, region splice, lock) are unit-tested in `bin/harness`.
+
 ## Layout summary
 
 ```
 .worktrees/                              # gitignored, agent worktrees
-.claude/commands/                        # /task-init, /issues-init, /task-implement, /task-run (committed)
+.claude/commands/                        # /task-init, /issues-init, /task-implement, /task-run, /harness-* (committed)
+.claude/harness-manifest                 # path → sync/region/ignore tier
+.claude/harness.lock                     # consumer-only: which harness version is installed
+bin/harness                              # tested helper: release + sync mechanics
+tests/test.sh                            # bin/harness test suite
+VERSION  CHANGELOG.md                    # harness semver + changelog
 docs/
   superpowers/                           # gitignored
     specs/YYYY-MM-DD-<topic>-design.md   # design docs (issues live in the tracker, not on disk)

@@ -64,6 +64,9 @@ tests/
 - **Branch off the default branch first — never commit to it directly.** Commit
   at green points so the branch is PR-ready.
 
+<!-- HARNESS:BEGIN -->
+<!-- Managed by the harness; `harness sync pull` replaces this block. Keep your
+     project-specific content above this marker. -->
 ## Workflow & agents
 
 The full loop (brainstorm → spec → issue(s) → worktree → TDD → verify → review →
@@ -87,3 +90,4 @@ backlog, auto-ordered → PRs). Key rules:
   never work in the main checkout. Multiple issues run as parallel agents, one
   worktree each.
 - **Conventional commits always**, scoped per sub-project.
+<!-- HARNESS:END -->
