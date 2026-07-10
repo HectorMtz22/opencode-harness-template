@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# harness — versioning + sync helper for the Claude Code harness template.
+#
+# Single dispatcher with subcommands. The pure helper functions below are
+# sourceable (see the guard at the bottom) so tests/test.sh can unit-test them
+# without invoking `main`.
+#
+# Portability: targets macOS system bash 3.2 + BSD tools. No associative
+# arrays, no ${var^^}, no mapfile, no `sort -V`, no GNU-only `sed -i`.
+
+# --- pure helpers (unit-tested via tests/test.sh) --------------------------
+
+# semver_cmp A B -> prints -1 (A<B), 0 (A==B), 1 (A>B).
+# Splits on '.' and compares each field numerically (no `sort -V`, which BSD
+# sort lacks).
+semver_cmp() {
+  local a1 a2 a3 b1 b2 b3
+  IFS=. read -r a1 a2 a3 <<EOF
+$1
+EOF
+  IFS=. read -r b1 b2 b3 <<EOF
+$2
+EOF
+  if [ "$a1" -ne "$b1" ]; then
+    [ "$a1" -lt "$b1" ] && printf '%s\n' -1 || printf '%s\n' 1
+    return 0
+  fi
+  if [ "$a2" -ne "$b2" ]; then
+    [ "$a2" -lt "$b2" ] && printf '%s\n' -1 || printf '%s\n' 1
+    return 0
+  fi
+  if [ "$a3" -ne "$b3" ]; then
+    [ "$a3" -lt "$b3" ] && printf '%s\n' -1 || printf '%s\n' 1
+    return 0
+  fi
+  printf '%s\n' 0
+}
+
+# semver_bump VERSION LEVEL -> prints the bumped version.
+#   major: X+1.0.0   minor: X.Y+1.0   patch: X.Y.Z+1
+semver_bump() {
+  local x y z
+  IFS=. read -r x y z <<EOF
+$1
+EOF
+  case "$2" in
+    major) printf '%s\n' "$((x + 1)).0.0" ;;
+    minor) printf '%s\n' "$x.$((y + 1)).0" ;;
+    patch) printf '%s\n' "$x.$y.$((z + 1))" ;;
+    *)
+      echo "harness: semver_bump: unknown level '$2' (want major|minor|patch)" >&2
+      return 1
+      ;;
+  esac
+}
+
+# _manifest_normalize FILE -> prints one "tier path" per real entry.
+# Ignores blank lines and `#` comments (leading whitespace tolerated).
+# Fails (non-zero + stderr) on a malformed line: not exactly `tier path`, or an
+# unknown tier.
+_manifest_normalize() {
+  local file="$1" line
+  if [ ! -f "$file" ]; then
+    echo "harness: manifest not found: $file" >&2
+    return 2
+  fi
+  while IFS= read -r line || [ -n "$line" ]; do
+    # Word-split collapses surrounding whitespace; $1 is the first token.
+    set -- $line
+    [ "$#" -eq 0 ] && continue
+    case "$1" in \#*) continue ;; esac
+    if [ "$#" -ne 2 ]; then
+      echo "harness: malformed manifest line (want '<tier> <path>'): $line" >&2
+      return 2
+    fi
+    case "$1" in
+      sync | region | ignore) ;;
+      *)
+        echo "harness: unknown tier '$1' in manifest line: $line" >&2
+        return 2
+        ;;
+    esac
+    printf '%s %s\n' "$1" "$2"
+  done < "$file"
+}
+
+# manifest_tier FILE PATH -> prints sync|region|ignore for a listed path.
+# Prints nothing and returns non-zero if the path is not listed.
+manifest_tier() {
+  local target="$2" normalized tier path found=""
+  normalized=$(_manifest_normalize "$1") || return 2
+  while read -r tier path; do
+    [ "$path" = "$target" ] && found="$tier"
+  done <<EOF
+$normalized
+EOF
+  if [ -n "$found" ]; then
+    printf '%s\n' "$found"
+    return 0
+  fi
+  return 1
+}
+
+# manifest_paths FILE TIER -> prints the paths of that tier, one per line.
+manifest_paths() {
+  local want="$2" normalized tier path
+  normalized=$(_manifest_normalize "$1") || return 2
+  while read -r tier path; do
+    [ "$tier" = "$want" ] && printf '%s\n' "$path"
+  done <<EOF
+$normalized
+EOF
+  return 0
+}
+
+# --- commands --------------------------------------------------------------
+
+# cmd_release LEVEL -> bump VERSION, roll CHANGELOG.md, commit, and tag.
+# Reads the release date from $HARNESS_RELEASE_DATE (else `date +%F`) so tests
+# stay deterministic. Refuses if any tracked file other than VERSION/CHANGELOG.md
+# has uncommitted changes.
+cmd_release() {
+  local level="$1" root cur new date dirty tmp
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    echo "harness: not inside a git repository" >&2
+    return 1
+  }
+
+  # Refuse on a dirty tree, ignoring VERSION/CHANGELOG.md (which release edits)
+  # and untracked files.
+  dirty=$(git -C "$root" status --porcelain --untracked-files=no \
+    | cut -c4- \
+    | grep -vxF -e 'VERSION' -e 'CHANGELOG.md' || true)
+  if [ -n "$dirty" ]; then
+    echo "harness: refusing to release — uncommitted changes to tracked files:" >&2
+    printf '  %s\n' $dirty >&2
+    return 1
+  fi
+
+  if [ ! -f "$root/VERSION" ]; then
+    echo "harness: VERSION not found at $root/VERSION" >&2
+    return 1
+  fi
+  cur=$(tr -d '[:space:]' < "$root/VERSION")
+  new=$(semver_bump "$cur" "$level") || return 1
+  date="${HARNESS_RELEASE_DATE:-$(date +%F)}"
+
+  if [ ! -f "$root/CHANGELOG.md" ]; then
+    echo "harness: CHANGELOG.md not found at $root/CHANGELOG.md" >&2
+    return 1
+  fi
+  if ! grep -q '^## \[Unreleased\]$' "$root/CHANGELOG.md"; then
+    echo "harness: CHANGELOG.md is missing a '## [Unreleased]' heading" >&2
+    return 1
+  fi
+
+  # Refuse before mutating if the tag already exists — otherwise the commit
+  # below would land with no tag, a partial release needing a manual reset.
+  if git -C "$root" rev-parse -q --verify "refs/tags/v$new" >/dev/null 2>&1; then
+    echo "harness: tag v$new already exists — refusing to re-release" >&2
+    return 1
+  fi
+
+  # Bump VERSION.
+  printf '%s\n' "$new" > "$root/VERSION"
+
+  # Roll the changelog: insert a new dated version heading directly after the
+  # Unreleased heading, so the prior Unreleased content now falls under it and
+  # Unreleased is left empty. Temp file + mv (BSD `sed -i` needs an arg).
+  tmp=$(mktemp "${TMPDIR:-/tmp}/harness.XXXXXX")
+  awk -v new="$new" -v d="$date" '
+    !done && $0 == "## [Unreleased]" {
+      print
+      print ""
+      print "## [" new "] - " d
+      done = 1
+      next
+    }
+    { print }
+  ' "$root/CHANGELOG.md" > "$tmp" && mv "$tmp" "$root/CHANGELOG.md"
+
+  # Commit and tag.
+  git -C "$root" add VERSION CHANGELOG.md \
+    && git -C "$root" commit -q -m "chore(harness): release v$new" \
+    && git -C "$root" tag "v$new" || {
+    echo "harness: git commit/tag step failed" >&2
+    return 1
+  }
+
+  echo "Released v$new"
+  echo "  VERSION   -> $new"
+  echo "  CHANGELOG -> ## [$new] - $date"
+  echo "  git tag   -> v$new"
+}
+
+# --- dispatcher ------------------------------------------------------------
+
+main() {
+  local sub="$1"
+  case "$sub" in
+    release)
+      shift
+      local level="$1"
+      case "$level" in
+        major | minor | patch) ;;
+        *)
+          echo "usage: harness release <major|minor|patch>" >&2
+          return 2
+          ;;
+      esac
+      cmd_release "$level"
+      ;;
+    # A `sync` subcommand (plan/pull/push) is added by a later issue; new
+    # subcommands slot in as additional cases here.
+    '' | -h | --help | help)
+      usage
+      return 2
+      ;;
+    *)
+      echo "harness: unknown command: $sub" >&2
+      usage
+      return 2
+      ;;
+  esac
+}
+
+usage() {
+  cat >&2 <<'USAGE'
+usage: harness <command> [args]
+
+commands:
+  release <major|minor|patch>   bump VERSION, roll CHANGELOG.md, commit, tag
+USAGE
+}
+
+# Run main only when executed directly, not when sourced for tests.
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+  main "$@"
+fi
