@@ -242,6 +242,57 @@ assert_eq "real manifest: tests/test.sh is sync" "sync" "$(manifest_tier "$REAL_
 assert_eq "real manifest: LICENSE is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" LICENSE)"
 
 # ---------------------------------------------------------------------------
+# region_splice — replace only the marked block, preserve the rest
+# ---------------------------------------------------------------------------
+RB='<!-- HARNESS:BEGIN -->'
+RE='<!-- HARNESS:END -->'
+
+SPLICE_FILE=$(mktmp)
+cat > "$SPLICE_FILE" <<EOF
+project intro line
+$RB
+old harness line 1
+old harness line 2
+$RE
+project outro line
+EOF
+
+NEWC=$(mktmp)
+cat > "$NEWC" <<'EOF'
+new harness line A
+new harness line B
+EOF
+
+region_splice "$SPLICE_FILE" "$RB" "$RE" "$NEWC"
+assert_ok "region_splice exits 0 on a well-formed file" "$?"
+grep -q '^project intro line$' "$SPLICE_FILE"
+assert_ok "region_splice preserves text before the block" "$?"
+grep -q '^project outro line$' "$SPLICE_FILE"
+assert_ok "region_splice preserves text after the block" "$?"
+grep -q '^new harness line B$' "$SPLICE_FILE"
+assert_ok "region_splice inserts the new content" "$?"
+grep -q 'old harness line' "$SPLICE_FILE"
+assert_nonzero "region_splice drops the old block content" "$?"
+assert_eq "region_splice keeps exactly one BEGIN marker" "1" "$(grep -cxF "$RB" "$SPLICE_FILE")"
+assert_eq "region_splice keeps exactly one END marker" "1" "$(grep -cxF "$RE" "$SPLICE_FILE")"
+
+# --- error: markers missing, file untouched ---
+NOMARK=$(mktmp)
+printf 'just a normal file\nno markers here\n' > "$NOMARK"
+NOMARK_BEFORE=$(cat "$NOMARK")
+region_splice "$NOMARK" "$RB" "$RE" "$NEWC" >/dev/null 2>&1
+assert_nonzero "region_splice fails when markers are missing" "$?"
+assert_eq "region_splice leaves file unchanged when markers missing" "$NOMARK_BEFORE" "$(cat "$NOMARK")"
+
+# --- error: unbalanced (BEGIN without END), file untouched ---
+UNBAL=$(mktmp)
+printf 'intro\n%s\nblock\n' "$RB" > "$UNBAL"
+UNBAL_BEFORE=$(cat "$UNBAL")
+region_splice "$UNBAL" "$RB" "$RE" "$NEWC" >/dev/null 2>&1
+assert_nonzero "region_splice fails when END marker is missing (unbalanced)" "$?"
+assert_eq "region_splice leaves file unchanged when unbalanced" "$UNBAL_BEFORE" "$(cat "$UNBAL")"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 printf '\n%s passed, %s failed (%s total)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"

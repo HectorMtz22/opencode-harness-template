@@ -113,6 +113,49 @@ EOF
   return 0
 }
 
+# region_splice FILE BEGIN END NEW_CONTENT_FILE -> replace the lines strictly
+# between the BEGIN and END marker lines with the contents of NEW_CONTENT_FILE,
+# preserving the markers themselves and everything outside them. Markers are
+# matched as whole lines (exact). Fails (non-zero, file untouched) unless the
+# file contains exactly one BEGIN and one END, with BEGIN before END.
+region_splice() {
+  local file="$1" begin="$2" end="$3" newfile="$4" nb ne bl el tmp
+  if [ ! -f "$file" ]; then
+    echo "harness: region_splice: file not found: $file" >&2
+    return 2
+  fi
+  if [ ! -f "$newfile" ]; then
+    echo "harness: region_splice: new-content file not found: $newfile" >&2
+    return 2
+  fi
+  nb=$(grep -cxF "$begin" "$file" 2>/dev/null || true)
+  ne=$(grep -cxF "$end" "$file" 2>/dev/null || true)
+  if [ "$nb" != 1 ] || [ "$ne" != 1 ]; then
+    echo "harness: region_splice: need exactly one '$begin' and one '$end' in $file (found $nb/$ne)" >&2
+    return 2
+  fi
+  bl=$(grep -nxF "$begin" "$file" | head -1 | cut -d: -f1)
+  el=$(grep -nxF "$end" "$file" | head -1 | cut -d: -f1)
+  if [ "$bl" -ge "$el" ]; then
+    echo "harness: region_splice: '$begin' must appear before '$end' in $file" >&2
+    return 2
+  fi
+
+  tmp=$(mktemp "${TMPDIR:-/tmp}/harness-splice.XXXXXX")
+  awk -v begin="$begin" -v end="$end" -v newfile="$newfile" '
+    $0 == begin {
+      print
+      while ((getline line < newfile) > 0) print line
+      close(newfile)
+      inblock = 1
+      next
+    }
+    $0 == end { inblock = 0; print; next }
+    inblock { next }
+    { print }
+  ' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
 # --- commands --------------------------------------------------------------
 
 # cmd_release LEVEL -> bump VERSION, roll CHANGELOG.md, commit, and tag.
