@@ -308,6 +308,33 @@ lock_read "${LOCK}.does-not-exist" version >/dev/null 2>&1
 assert_nonzero "lock_read on a missing file returns non-zero" "$?"
 
 # ---------------------------------------------------------------------------
+# _max_semver — highest X.Y.Z from stdin, ignoring non-semver lines
+# ---------------------------------------------------------------------------
+assert_eq "_max_semver picks the highest (numeric, not lexical)" "0.10.0" \
+  "$(printf '0.2.0\n0.10.0\n0.9.0\n' | _max_semver)"
+assert_eq "_max_semver ignores non-semver lines" "1.0.0" \
+  "$(printf 'garbage\nv1.0.0\n1.0.0\n0.9.9\n' | _max_semver)"
+assert_eq "_max_semver with a single version" "2.3.4" "$(printf '2.3.4\n' | _max_semver)"
+printf 'nope\n\n' | _max_semver >/dev/null 2>&1
+assert_nonzero "_max_semver fails when no valid version present" "$?"
+
+# ---------------------------------------------------------------------------
+# region_extract — the lines strictly between the markers (exclusive)
+# ---------------------------------------------------------------------------
+EXTRACT_FILE=$(mktmp)
+cat > "$EXTRACT_FILE" <<EOF
+before
+$RB
+line one
+line two
+$RE
+after
+EOF
+exp_block=$(printf '%s\n' 'line one' 'line two')
+assert_eq "region_extract returns only the block content" "$exp_block" \
+  "$(region_extract "$EXTRACT_FILE" "$RB" "$RE")"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 printf '\n%s passed, %s failed (%s total)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"

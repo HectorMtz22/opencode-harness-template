@@ -54,6 +54,33 @@ EOF
   esac
 }
 
+# _is_semver STRING -> 0 if STRING is exactly X.Y.Z with numeric fields.
+_is_semver() {
+  local x y z rest
+  IFS=. read -r x y z rest <<EOF
+$1
+EOF
+  [ -n "$x" ] && [ -n "$y" ] && [ -n "$z" ] && [ -z "$rest" ] || return 1
+  case "$x$y$z" in
+    '' | *[!0-9]*) return 1 ;;
+  esac
+  return 0
+}
+
+# _max_semver -> reads version strings on stdin (one per line), prints the
+# highest X.Y.Z. Non-semver lines are ignored; non-zero if none are valid.
+_max_semver() {
+  local best="" v
+  while IFS= read -r v || [ -n "$v" ]; do
+    _is_semver "$v" || continue
+    if [ -z "$best" ] || [ "$(semver_cmp "$v" "$best")" = 1 ]; then
+      best="$v"
+    fi
+  done
+  [ -n "$best" ] || return 1
+  printf '%s\n' "$best"
+}
+
 # _manifest_normalize FILE -> prints one "tier path" per real entry.
 # Ignores blank lines and `#` comments (leading whitespace tolerated).
 # Fails (non-zero + stderr) on a malformed line: not exactly `tier path`, or an
@@ -154,6 +181,16 @@ region_splice() {
     inblock { next }
     { print }
   ' "$file" > "$tmp" && mv "$tmp" "$file"
+}
+
+# region_extract FILE BEGIN END -> print the lines strictly between the marker
+# lines (markers excluded). Prints nothing if the markers are absent.
+region_extract() {
+  awk -v begin="$2" -v end="$3" '
+    $0 == end { inblock = 0 }
+    inblock { print }
+    $0 == begin { inblock = 1 }
+  ' "$1"
 }
 
 # lock_write FILE VERSION COMMIT REMOTE -> write the consumer's synced-state
