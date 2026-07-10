@@ -335,6 +335,102 @@ assert_eq "region_extract returns only the block content" "$exp_block" \
   "$(region_extract "$EXTRACT_FILE" "$RB" "$RE")"
 
 # ---------------------------------------------------------------------------
+# cmd_sync_plan / cmd_sync_pull (exercised against fixture upstream+consumer)
+# ---------------------------------------------------------------------------
+# Builds an "upstream" (template) repo tagged v0.2.0 and a "consumer" repo that
+# has the upstream added as remote 'harness', older managed files, and a lock at
+# 0.1.0. Echoes "<upstream>|<consumer>".
+setup_sync_fixture() {
+  local up con
+  up=$(mktmpdir)
+  con=$(mktmpdir)
+
+  git -C "$up" init -q
+  git -C "$up" config user.email t@e.com
+  git -C "$up" config user.name T
+  git -C "$up" config commit.gpgsign false
+  mkdir -p "$up/.claude"
+  cat > "$up/.claude/harness-manifest" <<'EOF'
+sync   HARNESS.md
+region CLAUDE.md
+ignore README.md
+EOF
+  printf 'UPSTREAM HARNESS v0.2.0\n' > "$up/HARNESS.md"
+  cat > "$up/CLAUDE.md" <<EOF
+# upstream heading (not synced)
+$RB
+upstream managed block v0.2.0
+$RE
+EOF
+  printf '0.2.0\n' > "$up/VERSION"
+  git -C "$up" add -A
+  git -C "$up" commit -q -m "upstream v0.2.0"
+  git -C "$up" tag v0.2.0
+
+  git -C "$con" init -q
+  git -C "$con" config user.email t@e.com
+  git -C "$con" config user.name T
+  git -C "$con" config commit.gpgsign false
+  git -C "$con" remote add harness "$up"
+  mkdir -p "$con/.claude"
+  printf 'sync HARNESS.md\n' > "$con/.claude/harness-manifest"
+  printf 'old consumer harness\n' > "$con/HARNESS.md"
+  cat > "$con/CLAUDE.md" <<EOF
+# My Project
+project-owned intro line
+$RB
+stale managed block
+$RE
+project-owned outro line
+EOF
+  lock_write "$con/.claude/harness.lock" 0.1.0 deadbeef harness
+  git -C "$con" add -A
+  git -C "$con" commit -q -m "consumer baseline"
+
+  printf '%s|%s' "$up" "$con"
+}
+
+# --- sync plan: dry run, reports overwrites/splices/version delta, no writes ---
+FIX=$(setup_sync_fixture)
+CON=${FIX#*|}
+plan_out=$( (cd "$CON" && cmd_sync_plan) 2>&1 )
+assert_ok "cmd_sync_plan exits 0" "$?"
+printf '%s\n' "$plan_out" | grep -q '0.1.0 -> 0.2.0'
+assert_ok "sync plan reports the version delta 0.1.0 -> 0.2.0" "$?"
+printf '%s\n' "$plan_out" | grep -Eq '^overwrite[[:space:]]+HARNESS.md$'
+assert_ok "sync plan lists HARNESS.md as an overwrite" "$?"
+printf '%s\n' "$plan_out" | grep -Eq '^splice[[:space:]]+CLAUDE.md$'
+assert_ok "sync plan lists CLAUDE.md as a splice" "$?"
+assert_eq "sync plan writes nothing (clean tree)" "" "$(git -C "$CON" status --porcelain)"
+assert_eq "sync plan leaves HARNESS.md untouched" "old consumer harness" "$(cat "$CON/HARNESS.md")"
+
+# --- sync pull: applies overwrites + splices, writes lock, preserves project text ---
+FIX2=$(setup_sync_fixture)
+UP2=${FIX2%%|*}
+CON2=${FIX2#*|}
+(cd "$CON2" && cmd_sync_pull) >/dev/null 2>&1
+assert_ok "cmd_sync_pull exits 0" "$?"
+assert_eq "pull overwrites the sync file from upstream" "UPSTREAM HARNESS v0.2.0" "$(cat "$CON2/HARNESS.md")"
+grep -q '^upstream managed block v0.2.0$' "$CON2/CLAUDE.md"
+assert_ok "pull splices the upstream managed block into CLAUDE.md" "$?"
+grep -q '^project-owned intro line$' "$CON2/CLAUDE.md"
+assert_ok "pull preserves the project-owned line before the region" "$?"
+grep -q '^project-owned outro line$' "$CON2/CLAUDE.md"
+assert_ok "pull preserves the project-owned line after the region" "$?"
+grep -q 'stale managed block' "$CON2/CLAUDE.md"
+assert_nonzero "pull replaces the stale managed block" "$?"
+assert_eq "pull updates the lock version" "0.2.0" "$(lock_read "$CON2/.claude/harness.lock" version)"
+assert_eq "pull records the upstream tag commit in the lock" \
+  "$(git -C "$UP2" rev-parse v0.2.0^{commit})" "$(lock_read "$CON2/.claude/harness.lock" commit)"
+
+# --- sync pull refuses on a dirty tree ---
+FIX3=$(setup_sync_fixture)
+CON3=${FIX3#*|}
+printf 'uncommitted edit\n' >> "$CON3/HARNESS.md"
+(cd "$CON3" && cmd_sync_pull) >/dev/null 2>&1
+assert_nonzero "cmd_sync_pull refuses on a dirty tree" "$?"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 printf '\n%s passed, %s failed (%s total)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"

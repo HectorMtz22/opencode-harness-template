@@ -299,6 +299,138 @@ cmd_release() {
   echo "  git tag   -> v$new"
 }
 
+# --- sync: pull upstream harness updates / push local ones back ------------
+#
+# Transport is a git remote (default name `harness`, override $HARNESS_REMOTE)
+# pointing at the template. Versions are the template's `vX.Y.Z` tags, fetched
+# into a private `refs/harness-remote/*` namespace so they never collide with
+# the consumer's own tags. The upstream repo for push PRs is
+# $HARNESS_UPSTREAM_REPO (default the canonical template).
+
+HARNESS_UPSTREAM_REPO="${HARNESS_UPSTREAM_REPO:-HectorMtz22/claude-code-harness-template}"
+
+_sync_root() { git rev-parse --show-toplevel 2>/dev/null; }
+
+# _sync_fetch ROOT REMOTE -> mirror the remote's version tags into
+# refs/harness-remote/*. Errors (with the fix) if the remote is not configured.
+_sync_fetch() {
+  local root="$1" remote="$2"
+  if ! git -C "$root" remote get-url "$remote" >/dev/null 2>&1; then
+    echo "harness: remote '$remote' not found — add it with:" >&2
+    echo "  git remote add $remote <template-repo-url>" >&2
+    return 1
+  fi
+  git -C "$root" fetch -q "$remote" '+refs/tags/v*:refs/harness-remote/v*' 2>/dev/null
+}
+
+# _sync_latest ROOT -> print the highest version available under the mirrored
+# refs; non-zero if none.
+_sync_latest() {
+  git -C "$1" for-each-ref --format='%(refname)' 'refs/harness-remote/*' \
+    | sed 's#^refs/harness-remote/v##' \
+    | _max_semver
+}
+
+# cmd_sync_plan -> dry run: fetch the remote, resolve the latest tag, read its
+# manifest, and print which files would be overwritten/spliced plus the version
+# delta. Writes nothing to the working tree.
+cmd_sync_plan() {
+  local remote root ver ref manifest_tmp fromver p
+  remote="${HARNESS_REMOTE:-harness}"
+  root=$(_sync_root) || { echo "harness: not inside a git repository" >&2; return 1; }
+  _sync_fetch "$root" "$remote" || return 1
+  ver=$(_sync_latest "$root") || {
+    echo "harness: no vX.Y.Z tags found on remote '$remote'" >&2
+    return 1
+  }
+  ref="refs/harness-remote/v$ver"
+
+  manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/harness-manifest.XXXXXX")
+  if ! git -C "$root" show "$ref:.claude/harness-manifest" > "$manifest_tmp" 2>/dev/null; then
+    echo "harness: no .claude/harness-manifest at $ref" >&2
+    rm -f "$manifest_tmp"
+    return 1
+  fi
+
+  fromver=$(lock_read "$root/.claude/harness.lock" version 2>/dev/null) || fromver="(none)"
+
+  echo "harness sync plan (remote: $remote)"
+  echo "  version: $fromver -> $ver"
+  manifest_paths "$manifest_tmp" sync | while IFS= read -r p; do
+    [ -n "$p" ] && printf 'overwrite  %s\n' "$p"
+  done
+  manifest_paths "$manifest_tmp" region | while IFS= read -r p; do
+    [ -n "$p" ] && printf 'splice     %s\n' "$p"
+  done
+  rm -f "$manifest_tmp"
+  echo "(dry run — no files changed)"
+}
+
+# cmd_sync_pull -> apply the plan: overwrite sync-tier files from the pinned
+# tag, splice region-tier blocks (preserving project content), and rewrite the
+# lock. Refuses on a dirty tree.
+cmd_sync_pull() {
+  local remote root ver ref manifest_tmp dirty p mb me tmpl blk sha
+  remote="${HARNESS_REMOTE:-harness}"
+  root=$(_sync_root) || { echo "harness: not inside a git repository" >&2; return 1; }
+
+  dirty=$(git -C "$root" status --porcelain --untracked-files=no)
+  if [ -n "$dirty" ]; then
+    echo "harness: refusing to pull — commit or stash changes first:" >&2
+    printf '%s\n' "$dirty" >&2
+    return 1
+  fi
+
+  _sync_fetch "$root" "$remote" || return 1
+  ver=$(_sync_latest "$root") || {
+    echo "harness: no vX.Y.Z tags found on remote '$remote'" >&2
+    return 1
+  }
+  ref="refs/harness-remote/v$ver"
+
+  manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/harness-manifest.XXXXXX")
+  if ! git -C "$root" show "$ref:.claude/harness-manifest" > "$manifest_tmp" 2>/dev/null; then
+    echo "harness: no .claude/harness-manifest at $ref" >&2
+    rm -f "$manifest_tmp"
+    return 1
+  fi
+
+  # sync tier: overwrite wholesale from the tag.
+  manifest_paths "$manifest_tmp" sync | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    mkdir -p "$(dirname "$root/$p")"
+    git -C "$root" show "$ref:$p" > "$root/$p" 2>/dev/null \
+      || echo "harness: warning: $p missing at $ref, skipped" >&2
+  done
+
+  # region tier: replace only the marked block, keeping project content.
+  manifest_paths "$manifest_tmp" region | while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    case "$p" in
+      *.gitignore) mb='# HARNESS:BEGIN'; me='# HARNESS:END' ;;
+      *) mb='<!-- HARNESS:BEGIN -->'; me='<!-- HARNESS:END -->' ;;
+    esac
+    if [ ! -f "$root/$p" ]; then
+      echo "harness: warning: region file $p not present locally, skipped" >&2
+      continue
+    fi
+    tmpl=$(mktemp "${TMPDIR:-/tmp}/harness-tmpl.XXXXXX")
+    blk=$(mktemp "${TMPDIR:-/tmp}/harness-blk.XXXXXX")
+    if git -C "$root" show "$ref:$p" > "$tmpl" 2>/dev/null; then
+      region_extract "$tmpl" "$mb" "$me" > "$blk"
+      region_splice "$root/$p" "$mb" "$me" "$blk" \
+        || echo "harness: warning: could not splice $p (markers missing?)" >&2
+    fi
+    rm -f "$tmpl" "$blk"
+  done
+
+  sha=$(git -C "$root" rev-parse "$ref^{commit}")
+  lock_write "$root/.claude/harness.lock" "$ver" "$sha" "$remote"
+  rm -f "$manifest_tmp"
+
+  echo "Pulled harness v$ver from '$remote'"
+}
+
 # --- dispatcher ------------------------------------------------------------
 
 main() {
