@@ -156,6 +156,32 @@ region_splice() {
   ' "$file" > "$tmp" && mv "$tmp" "$file"
 }
 
+# lock_write FILE VERSION COMMIT REMOTE -> write the consumer's synced-state
+# lock as simple key=value lines.
+lock_write() {
+  local file="$1" version="$2" commit="$3" remote="$4"
+  {
+    printf 'version=%s\n' "$version"
+    printf 'commit=%s\n' "$commit"
+    printf 'remote=%s\n' "$remote"
+  } > "$file"
+}
+
+# lock_read FILE KEY -> print the value for KEY. Non-zero if the file is missing
+# or the key is absent.
+lock_read() {
+  local file="$1" key="$2" line
+  if [ ! -f "$file" ]; then
+    echo "harness: lock not found: $file" >&2
+    return 2
+  fi
+  line=$(grep "^$key=" "$file" | head -1)
+  if [ -z "$line" ]; then
+    return 1
+  fi
+  printf '%s\n' "${line#*=}"
+}
+
 # --- commands --------------------------------------------------------------
 
 # cmd_release LEVEL -> bump VERSION, roll CHANGELOG.md, commit, and tag.

@@ -293,6 +293,21 @@ assert_nonzero "region_splice fails when END marker is missing (unbalanced)" "$?
 assert_eq "region_splice leaves file unchanged when unbalanced" "$UNBAL_BEFORE" "$(cat "$UNBAL")"
 
 # ---------------------------------------------------------------------------
+# lock_read / lock_write — consumer-side synced state round-trip
+# ---------------------------------------------------------------------------
+LOCK=$(mktmp)
+lock_write "$LOCK" 0.3.0 abc123def harness
+assert_ok "lock_write exits 0" "$?"
+assert_eq "lock round-trip: version" "0.3.0" "$(lock_read "$LOCK" version)"
+assert_eq "lock round-trip: commit" "abc123def" "$(lock_read "$LOCK" commit)"
+assert_eq "lock round-trip: remote" "harness" "$(lock_read "$LOCK" remote)"
+
+lock_read "$LOCK" nope >/dev/null 2>&1
+assert_nonzero "lock_read on an absent key returns non-zero" "$?"
+lock_read "${LOCK}.does-not-exist" version >/dev/null 2>&1
+assert_nonzero "lock_read on a missing file returns non-zero" "$?"
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 printf '\n%s passed, %s failed (%s total)\n' "$PASS" "$FAIL" "$((PASS + FAIL))"
