@@ -31,13 +31,17 @@ missing.
 1. **Plan first.** Run `bin/harness sync plan`. It fetches the template's tags
    into a private ref namespace (never touching your own tags), reads the
    manifest at the latest version, and prints the version delta plus every
-   `overwrite` (a `sync`-tier file replaced wholesale) and `splice` (a `region`
-   file where only the `HARNESS:BEGIN…END` block changes). **Nothing is written.**
+   `overwrite` (a `sync`-tier file replaced wholesale), `keep` (a `sync` file you
+   customized since the last sync — diffed against the locked baseline commit and
+   left untouched), and `splice` (a `region` file where only the
+   `HARNESS:BEGIN…END` block changes). **Nothing is written.**
 2. **Show the user the plan** and confirm before applying.
 3. **Apply.** On approval run `bin/harness sync pull`. It refuses on a dirty
-   tree — commit or stash first. It overwrites the `sync` files, splices the
-   `region` blocks (your project content outside the markers is preserved), and
-   rewrites `.claude/harness.lock` with the new `version` / `commit` / `remote`.
+   tree — commit or stash first. It overwrites the untouched `sync` files, **keeps**
+   any `sync` file you customized since the last sync (so local work is never
+   clobbered), splices the `region` blocks (your project content outside the
+   markers is preserved), and rewrites `.claude/harness.lock` with the new
+   `version` / `commit` / `remote`.
 4. **Review the diff** (`git diff`), run the repo's tests, then commit —
    e.g. `chore(harness): sync to v<version>`. The lock file records what you're on.
 

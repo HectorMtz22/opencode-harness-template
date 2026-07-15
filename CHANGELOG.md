@@ -10,6 +10,14 @@ rolls the **Unreleased** section below into a dated version heading and tags
 
 ## [Unreleased]
 
+### Changed
+
+- `sync pull` no longer clobbers harness files a consumer has customized: each
+  `sync`-tier file is diffed against the locked baseline commit and **kept** when
+  it was modified locally (only untouched files are overwritten). `sync plan`
+  labels these `keep … (locally modified)` instead of `overwrite`. A repo with no
+  lock yet (first sync) has no baseline, so overwrite stays the default there.
+
 ## [0.2.0] - 2026-07-10
 
 ### Added

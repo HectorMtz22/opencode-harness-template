@@ -467,6 +467,56 @@ assert_eq "pull overwrites the present sync file" "UPSTREAM HARNESS" "$(cat "$GC
 assert_eq "pull preserves a local file when its sync path is missing at the tag" \
   "PRECIOUS local content" "$(cat "$GCON/GHOST.md")"
 
+# --- sync keeps a locally-modified sync file, overwrites an unmodified one -----
+# Upstream carries two sync files across two versions; the consumer's lock points
+# at the v0.1.0 baseline, with one file locally edited and one untouched.
+MUP=$(mktmpdir)
+MCON=$(mktmpdir)
+git -C "$MUP" init -q
+git -C "$MUP" config user.email t@e.com
+git -C "$MUP" config user.name T
+git -C "$MUP" config commit.gpgsign false
+mkdir -p "$MUP/.claude"
+printf 'sync HARNESS.md\nsync KEEPME.md\n' > "$MUP/.claude/harness-manifest"
+printf 'harness v1\n' > "$MUP/HARNESS.md"
+printf 'base\n' > "$MUP/KEEPME.md"
+git -C "$MUP" add -A
+git -C "$MUP" commit -q -m v1
+git -C "$MUP" tag v0.1.0
+MBASE=$(git -C "$MUP" rev-parse v0.1.0^{commit})
+printf 'harness v2\n' > "$MUP/HARNESS.md"
+printf 'base2\n' > "$MUP/KEEPME.md"
+git -C "$MUP" add -A
+git -C "$MUP" commit -q -m v2
+git -C "$MUP" tag v0.2.0
+
+git -C "$MCON" init -q
+git -C "$MCON" config user.email t@e.com
+git -C "$MCON" config user.name T
+git -C "$MCON" config commit.gpgsign false
+git -C "$MCON" remote add harness "$MUP"
+mkdir -p "$MCON/.claude"
+printf 'sync HARNESS.md\nsync KEEPME.md\n' > "$MCON/.claude/harness-manifest"
+printf 'harness v1 LOCALLY EDITED\n' > "$MCON/HARNESS.md"   # customized since baseline
+printf 'base\n' > "$MCON/KEEPME.md"                          # untouched since baseline
+lock_write "$MCON/.claude/harness.lock" 0.1.0 "$MBASE" harness
+git -C "$MCON" add -A
+git -C "$MCON" commit -q -m con
+
+# plan annotates keep vs overwrite (baseline still v0.1.0)
+mplan=$( (cd "$MCON" && cmd_sync_plan) 2>&1 )
+printf '%s\n' "$mplan" | grep -Eq '^keep[[:space:]]+HARNESS.md \(locally modified\)$'
+assert_ok "sync plan marks a locally-modified sync file as keep" "$?"
+printf '%s\n' "$mplan" | grep -Eq '^overwrite[[:space:]]+KEEPME.md$'
+assert_ok "sync plan marks an unmodified sync file as overwrite" "$?"
+
+# pull keeps the modified file, overwrites the untouched one, advances the lock
+(cd "$MCON" && cmd_sync_pull) >/dev/null 2>&1
+assert_ok "cmd_sync_pull (keep-modified) exits 0" "$?"
+assert_eq "pull keeps a locally-modified sync file" "harness v1 LOCALLY EDITED" "$(cat "$MCON/HARNESS.md")"
+assert_eq "pull overwrites an unmodified sync file" "base2" "$(cat "$MCON/KEEPME.md")"
+assert_eq "pull advances the lock even when a file was kept" "0.2.0" "$(lock_read "$MCON/.claude/harness.lock" version)"
+
 # ---------------------------------------------------------------------------
 # cmd_sync_push — branch + commit managed diffs, hand off to gh (seam stubbed)
 # ---------------------------------------------------------------------------
