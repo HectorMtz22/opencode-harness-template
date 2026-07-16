@@ -221,7 +221,9 @@ commands drive it.
   bumps `VERSION`, rolls the `CHANGELOG.md` **Unreleased** section into a dated
   heading, commits, and tags `vX.Y.Z`.
 - **The manifest** — `.claude/harness-manifest` classifies every path:
-  - `sync` — harness-owned; **overwritten** wholesale on a pull.
+  - `sync` — harness-owned; overwritten wholesale on a pull, **except** files you
+    customized since the last sync (diffed against the locked baseline commit),
+    which are **kept**.
   - `region` — mixed; only the `HARNESS:BEGIN…END` block is replaced, so your
     project content (the `CLAUDE.md` project table, extra `.gitignore` lines)
     survives.
@@ -235,9 +237,10 @@ commands drive it.
   commits **only** the managed files, and opens a PR against the template (falls
   back to printing the manual `gh` command if `gh` is absent).
 
-`sync`-tier files are overwritten rather than 3-way merged (a consumer never
-edits them — that's what push is for). Never hand-edit inside a region's
-markers; a pull replaces that block.
+`sync`-tier files are overwritten rather than 3-way merged, but a pull **keeps**
+any you've customized locally (diffed against the locked baseline commit) instead
+of clobbering them — push your improvement back upstream when you want it in the
+template. Never hand-edit inside a region's markers; a pull replaces that block.
 
 ## Guardrails
 

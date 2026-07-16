@@ -331,11 +331,29 @@ _sync_latest() {
     | _max_semver
 }
 
+# _sync_locally_modified ROOT PREVCOMMIT PATH -> 0 (true) when the consumer has
+# locally CUSTOMIZED PATH since the last sync, so a pull must KEEP it instead of
+# overwriting. True when the local file exists and differs from its blob at the
+# locked baseline commit (or is absent from that commit — a local addition).
+# False (return 1, overwrite is safe) when there is no usable baseline (empty or
+# unresolvable PREVCOMMIT — e.g. a first-ever sync), the local file is absent, or
+# it still matches the baseline blob. Never overwrite work a consumer has done.
+_sync_locally_modified() {
+  local root="$1" prev="$2" path="$3" base
+  [ -n "$prev" ] || return 1
+  git -C "$root" rev-parse -q --verify "$prev^{commit}" >/dev/null 2>&1 || return 1
+  [ -f "$root/$path" ] || return 1
+  if base=$(git -C "$root" show "$prev:$path" 2>/dev/null); then
+    [ "$base" = "$(cat "$root/$path")" ] && return 1 || return 0
+  fi
+  return 0
+}
+
 # cmd_sync_plan -> dry run: fetch the remote, resolve the latest tag, read its
 # manifest, and print which files would be overwritten/spliced plus the version
 # delta. Writes nothing to the working tree.
 cmd_sync_plan() {
-  local remote root ver ref manifest_tmp fromver p
+  local remote root ver ref manifest_tmp fromver prevcommit p
   remote="${HARNESS_REMOTE:-harness}"
   root=$(_sync_root) || { echo "harness: not inside a git repository" >&2; return 1; }
   _sync_fetch "$root" "$remote" || return 1
@@ -353,11 +371,17 @@ cmd_sync_plan() {
   fi
 
   fromver=$(lock_read "$root/.claude/harness.lock" version 2>/dev/null) || fromver="(none)"
+  prevcommit=$(lock_read "$root/.claude/harness.lock" commit 2>/dev/null) || prevcommit=""
 
   echo "harness sync plan (remote: $remote)"
   echo "  version: $fromver -> $ver"
   manifest_paths "$manifest_tmp" sync | while IFS= read -r p; do
-    [ -n "$p" ] && printf 'overwrite  %s\n' "$p"
+    [ -n "$p" ] || continue
+    if _sync_locally_modified "$root" "$prevcommit" "$p"; then
+      printf 'keep       %s (locally modified)\n' "$p"
+    else
+      printf 'overwrite  %s\n' "$p"
+    fi
   done
   manifest_paths "$manifest_tmp" region | while IFS= read -r p; do
     [ -n "$p" ] && printf 'splice     %s\n' "$p"
@@ -370,7 +394,7 @@ cmd_sync_plan() {
 # tag, splice region-tier blocks (preserving project content), and rewrite the
 # lock. Refuses on a dirty tree.
 cmd_sync_pull() {
-  local remote root ver ref manifest_tmp dirty p mb me tmpl blk sha stmp
+  local remote root ver ref manifest_tmp dirty p mb me tmpl blk sha stmp prevcommit
   remote="${HARNESS_REMOTE:-harness}"
   root=$(_sync_root) || { echo "harness: not inside a git repository" >&2; return 1; }
 
@@ -395,11 +419,21 @@ cmd_sync_pull() {
     return 1
   fi
 
-  # sync tier: overwrite wholesale from the tag. Write to a temp file first and
-  # mv into place only on success, so a path missing at the tag can't truncate
-  # the consumer's existing file.
+  # A file the consumer customized since the last sync must never be clobbered:
+  # read the baseline commit from the lock and skip any sync file that no longer
+  # matches it (see _sync_locally_modified).
+  prevcommit=$(lock_read "$root/.claude/harness.lock" commit 2>/dev/null) || prevcommit=""
+
+  # sync tier: overwrite wholesale from the tag — EXCEPT files the consumer has
+  # locally modified, which are kept. Write to a temp file first and mv into
+  # place only on success, so a path missing at the tag can't truncate the
+  # consumer's existing file.
   manifest_paths "$manifest_tmp" sync | while IFS= read -r p; do
     [ -n "$p" ] || continue
+    if _sync_locally_modified "$root" "$prevcommit" "$p"; then
+      echo "harness: kept (locally modified): $p" >&2
+      continue
+    fi
     stmp=$(mktemp "${TMPDIR:-/tmp}/harness-sync.XXXXXX")
     if git -C "$root" show "$ref:$p" > "$stmp" 2>/dev/null; then
       mkdir -p "$(dirname "$root/$p")"
