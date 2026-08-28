@@ -12,16 +12,16 @@
 #   ignore  template-only or project-owned; never synced.
 
 # --- sync: harness-owned, overwritten on pull ---
-sync    .claude/commands/harness-bootstrap.md
-sync    .claude/commands/harness-setup.md
-sync    .claude/commands/harness-sync.md
-sync    .claude/commands/issues-init.md
-sync    .claude/commands/task-implement.md
-sync    .claude/commands/task-init.md
-sync    .claude/commands/task-run.md
+sync    .opencode/commands/harness-bootstrap.md
+sync    .opencode/commands/harness-setup.md
+sync    .opencode/commands/harness-sync.md
+sync    .opencode/commands/issues-init.md
+sync    .opencode/commands/task-implement.md
+sync    .opencode/commands/task-init.md
+sync    .opencode/commands/task-run.md
 sync    HARNESS.md
 sync    AGENTS.md
-sync    .claude/harness-manifest
+sync    .opencode/harness-manifest
 sync    bin/harness
 sync    tests/test.sh
 
@@ -31,9 +31,9 @@ region  .gitignore
 
 # --- ignore: template-only or project-owned; never synced ---
 ignore  README.md
-ignore  .claude/commands/harness-release.md
+ignore  .opencode/commands/harness-release.md
 ignore  VERSION
 ignore  CHANGELOG.md
-ignore  .claude/tracker.md
-ignore  .claude/harness.lock
+ignore  .opencode/tracker.md
+ignore  .opencode/harness.lock
 ignore  LICENSE
