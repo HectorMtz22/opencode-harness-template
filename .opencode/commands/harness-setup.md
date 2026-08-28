@@ -1,11 +1,11 @@
 ---
-description: Choose the issue tracker (default Plane) and write .claude/tracker.md
+description: Choose the issue tracker (default Plane) and write .opencode/tracker.md
 ---
 
 # /harness-setup — configure the tracker
 
 One-time, **offline** setup. Asks which tracker the harness should use and writes
-`.claude/tracker.md`. Makes no network/MCP calls — run `/harness-bootstrap` after
+`.opencode/tracker.md`. Makes no network/MCP calls — run `/harness-bootstrap` after
 this to provision the live tracker.
 
 ## Steps
@@ -28,7 +28,7 @@ this to provision the live tracker.
    - Confirm `cycle_length` (`1w`) and `cycle_anchor` (`monday`); accept defaults
      unless the user overrides.
 
-4. **Write `.claude/tracker.md`** with the chosen values (same key set as the
+4. **Write `.opencode/tracker.md`** with the chosen values (same key set as the
    committed example). Overwrite if it exists.
 
 5. **Report** the written values and tell the user to run `/harness-bootstrap`

@@ -4,13 +4,13 @@ description: Provision the tracker — create project, states, type labels, and 
 
 # /harness-bootstrap — provision the tracker
 
-**Live, idempotent** setup. Reads `.claude/tracker.md` and creates anything the
+**Live, idempotent** setup. Reads `.opencode/tracker.md` and creates anything the
 harness assumes but that doesn't exist yet. Safe to re-run. Run `/harness-setup`
-first if `.claude/tracker.md` is missing.
+first if `.opencode/tracker.md` is missing.
 
 ## Read config
 
-Load `.claude/tracker.md`: `tracker`, `mcp_prefix`, `project_code`, `project_id`,
+Load `.opencode/tracker.md`: `tracker`, `mcp_prefix`, `project_code`, `project_id`,
 `has_cycles`, `cycle_length`, `cycle_anchor`. Tool names below use
 `<mcp_prefix>` (Plane default: `plane`).
 
@@ -18,7 +18,7 @@ Load `.claude/tracker.md`: `tracker`, `mcp_prefix`, `project_code`, `project_id`
 
 1. **Project.** `<mcp_prefix>_project` (`action: list`). If no project matches
    `project_code`/name, `<mcp_prefix>_project` (`action: create`). Record `project_id` back
-   into `.claude/tracker.md` if it was unset.
+   into `.opencode/tracker.md` if it was unset.
 
 2. **States.** `<mcp_prefix>_state` (`action: list`). Ensure these exist (create the
    missing ones via `<mcp_prefix>_state` (`action: create`)):

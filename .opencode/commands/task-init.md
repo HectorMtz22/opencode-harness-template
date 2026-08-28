@@ -13,7 +13,7 @@ Task description (may be empty — ask if so): **$ARGUMENTS**
 
 ## Tracker coordinates
 
-Read these from `.claude/tracker.md` (written by `/harness-setup`):
+Read these from `.opencode/tracker.md` (written by `/harness-setup`):
 `tracker`, `mcp_prefix`, `project_code`, `project_id`. If the file is missing,
 tell the user to run `/harness-setup` first.
 

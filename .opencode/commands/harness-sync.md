@@ -8,7 +8,7 @@ Runs **in a consumer** repo (one that adopted this harness). Talks to the
 upstream template through a git remote named `harness` (versions are its
 `vX.Y.Z` tags) and drives `bin/harness sync`. All the risky mechanics —
 resolving the latest tag, overwriting `sync`-tier files, splicing only the
-marked block of `region`-tier files, writing `.claude/harness.lock` — live in
+marked block of `region`-tier files, writing `.opencode/harness.lock` — live in
 `bin/harness` and are unit-tested; this command just orchestrates and shows you
 the plan first.
 
@@ -39,7 +39,7 @@ missing.
    tree — commit or stash first. It overwrites the untouched `sync` files, **keeps**
    any `sync` file you customized since the last sync (so local work is never
    clobbered), splices the `region` blocks (your project content outside the
-   markers is preserved), and rewrites `.claude/harness.lock` with the new
+   markers is preserved), and rewrites `.opencode/harness.lock` with the new
    `version` / `commit` / `remote`.
 4. **Review the diff** (`git diff`), run the repo's tests, then commit —
    e.g. `chore(harness): sync to v<version>`. The lock file records what you're on.
@@ -63,5 +63,5 @@ Use when you've improved a `sync`/`region` file locally and want it upstream.
   files.
 - **Region files keep project content** outside the `HARNESS:BEGIN…END` markers;
   never hand-edit inside those markers (a pull will replace it).
-- `.claude/harness.lock` is the consumer's synced-state record — commit it.
+- `.opencode/harness.lock` is the consumer's synced-state record — commit it.
 - `bin/harness` owns the mechanics; don't reimplement sync logic in this command.
