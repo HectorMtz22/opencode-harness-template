@@ -1,6 +1,5 @@
 ---
 description: Choose the issue tracker (default Plane) and write .claude/tracker.md
-argument-hint: (none; interactive)
 ---
 
 # /harness-setup — configure the tracker
@@ -17,8 +16,8 @@ this to provision the live tracker.
 2. **Map the choice** to defaults:
    | Tracker | `mcp_prefix` | `has_cycles` |
    |---|---|---|
-   | Plane | `mcp__plane` | `true` |
-   | Linear | `mcp__linear` (or the connected server's prefix) | `true` |
+   | Plane | `plane` | `true` |
+   | Linear | `linear` (or the connected server's prefix) | `true` |
    | GitHub Issues | `gh` CLI / MCP prefix | `false` (uses milestones) |
    | other | ask the user | ask the user |
 

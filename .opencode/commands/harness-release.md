@@ -1,6 +1,5 @@
 ---
 description: Cut a harness release — bump VERSION, roll CHANGELOG.md, commit, and tag (template repo only)
-argument-hint: [major|minor|patch]
 ---
 
 # /harness-release — cut a harness version

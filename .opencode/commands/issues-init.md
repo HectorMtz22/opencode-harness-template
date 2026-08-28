@@ -1,6 +1,5 @@
 ---
 description: Decompose an epic into many linked tracker issues, ready for /task-run
-argument-hint: [short description of the epic / broad goal]
 ---
 
 # /issues-init — decompose an epic into issues
@@ -22,20 +21,22 @@ to run `/harness-setup` first.
 - Project = `project_code` (pass `project_id` to MCP tools that need it).
 - Resolve states, labels, and the relation type **by name at runtime** — don't
   hardcode UUIDs:
-  - `<mcp_prefix>__list_states` → pick the state named **"Todo"**.
-  - `<mcp_prefix>__list_labels` → map label names to IDs.
+  - `<mcp_prefix>_state` (`action: list`) → pick the state named **"Todo"**.
+  - `<mcp_prefix>_label` (`action: list`) → map label names to IDs.
 - **Grouping + dependency links** are tracker-specific — use what yours supports:
-  - _Grouping:_ a parent **epic** (Plane `<mcp_prefix>__create_epic`), a parent
+  - _Grouping:_ a parent **epic** (Plane `<mcp_prefix>_workitem_type` with
+    `action: resolve`, name **Epic**), a parent
     issue or project (Linear), or a **milestone** (GitHub). Skip if none exists.
   - _Dependency links:_ **blocks / blocked-by** relations (Plane
-    `<mcp_prefix>__create_work_item_relation`; Linear issue relations). If the
+    `<mcp_prefix>_workitem_relation` with `action: create`; Linear issue relations). If the
     tracker has no relation type (e.g. GitHub Issues), record each chunk's
     blockers **in its description** instead — `/task-run` still orders by
     file-overlap.
 
 ## Steps
 
-1. **Brainstorm at epic altitude.** Invoke `superpowers:brainstorming`, but aim
+1. **Brainstorm at epic altitude.** Invoke the `brainstorming` skill (via the
+   `skill` tool), but aim
    one level up: agree on scope (in / out), then **decompose** the epic into
    independent, PR-sized chunks and their dependency order. For each chunk pin
    down: an imperative name, the **type** (`feat`/`fix`/`refactor`/`test`/`docs`/
@@ -50,7 +51,7 @@ to run `/harness-setup` first.
    copied into the issue so `/task-run` can read them without opening the spec.
 
 3. **Draft the issue bodies.** For **3+ chunks**, dispatch one drafting agent per
-   chunk (`superpowers:dispatching-parallel-agents`, single message) to write that
+   chunk (via the `dispatching-parallel-agents` skill, single message) to write that
    chunk's issue description (problem, approach, code map, test list) from the epic
    spec, and **report the text back**. Agents draft only — they do **not** touch
    the tracker. For **≤2 chunks**, draft inline; don't spin up agents for that.

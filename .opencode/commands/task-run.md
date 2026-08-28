@@ -1,6 +1,5 @@
 ---
 description: Read the tracker backlog, plan a parallel/sequential order, and drive it through /task-implement
-argument-hint: [project_code-12 …] or a label (optional; defaults to all Todo issues)
 ---
 
 # /task-run — run the backlog, auto-ordered
@@ -20,10 +19,10 @@ Read these from `.claude/tracker.md` (written by `/harness-setup`): `tracker`,
 to run `/harness-setup` first.
 
 - Project = `project_code` (pass `project_id` to MCP tools that need it).
-- Resolve states **by name at runtime** via `<mcp_prefix>__list_states`:
+- Resolve states **by name at runtime** via `<mcp_prefix>_state` (`action: list`):
   **"Todo"**, **"In Progress"**, **"In Review"**, **"Done"**.
 - Read dependency links via the tracker's relation tool
-  (Plane `<mcp_prefix>__list_work_item_relations`; **blocks / blocked-by**). If
+  (Plane `<mcp_prefix>_workitem_relation` with `action: list`; **blocks / blocked-by**). If
   the tracker has no relations, skip this signal and order by file-overlap alone.
 
 ## Steps
@@ -50,16 +49,17 @@ to run `/harness-setup` first.
 
 4. **Execute batch by batch** — reuse `/task-implement`'s mechanics per issue:
    - Move each issue in the batch to **In Progress**; create one worktree each
-     (`superpowers:using-git-worktrees`, `<type>/<scope>-<topic>` under
+     (via the `using-git-worktrees` skill, `<type>/<scope>-<topic>` under
      `.worktrees/`).
    - Dispatch the batch's implementation agents in a **single message**
-     (`superpowers:dispatching-parallel-agents` + `subagent-driven-development`),
-     each following TDD (red → green → refactor, full suite). Give each its issue +
-     spec, worktree path, code map, and "don't touch the main checkout or sibling
-     worktrees".
+      (via the `dispatching-parallel-agents` and `subagent-driven-development`
+      skills),
+      each following TDD (red → green → refactor, full suite). Give each its issue +
+      spec, worktree path, code map, and "don't touch the main checkout or sibling
+      worktrees".
    - **Verify (parent):** inspect each diff and run the full project suite
-     (`superpowers:verification-before-completion`).
-   - **Code review (parent):** run `superpowers:requesting-code-review` per branch.
+      (via the `verification-before-completion` skill).
+   - **Code review (parent):** run the `requesting-code-review` skill per branch.
      **Report findings grouped by severity (Critical / Important / Minor) and ask
      which to fix — do NOT auto-fix.** Apply only what the user approves, re-review.
    - **Commit + PR (parent):** worktree agents run from the main checkout, so the

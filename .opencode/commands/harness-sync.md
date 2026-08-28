@@ -1,6 +1,5 @@
 ---
 description: Sync the harness with its upstream template — pull updates in, or push local harness changes back as a PR
-argument-hint: [plan|pull|push <topic>]
 ---
 
 # /harness-sync — keep this repo's harness in step with the template

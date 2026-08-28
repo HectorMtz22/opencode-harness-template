@@ -6,7 +6,7 @@ on purpose — it's harness config, not a scratch spec.
 
 ```yaml
 tracker:       plane          # plane | linear | github | other
-mcp_prefix:    mcp__plane      # MCP tool namespace, e.g. mcp__plane__create_cycle
+mcp_prefix:    plane            # OpenCode MCP server name — tools surface as <prefix>_<resource> (e.g. plane_state) with an action param
 project_code:  PROJ            # short id used in issue identifiers (PROJ-12)
 project_id:    <uuid-or-slug>  # set if the MCP server needs one (Plane does)
 has_cycles:    true            # true → time-boxed cycles; false → milestones/none
