@@ -20,13 +20,12 @@ sync    .opencode/commands/task-implement.md
 sync    .opencode/commands/task-init.md
 sync    .opencode/commands/task-run.md
 sync    HARNESS.md
-sync    AGENTS.md
 sync    .opencode/harness-manifest
 sync    bin/harness
 sync    tests/test.sh
 
 # --- region: mixed; only the HARNESS:BEGIN/END block is replaced ---
-region  CLAUDE.md
+region  AGENTS.md
 region  .gitignore
 
 # --- ignore: template-only or project-owned; never synced ---
