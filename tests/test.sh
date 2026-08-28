@@ -106,7 +106,7 @@ cat > "$MANIFEST" <<'EOF'
 sync   HARNESS.md
 sync   .opencode/commands/task-init.md
 
-region CLAUDE.md
+region AGENTS.md
 region .gitignore
 
 # trailing comment
@@ -115,7 +115,7 @@ ignore VERSION
 EOF
 
 assert_eq "manifest_tier: sync path" "sync" "$(manifest_tier "$MANIFEST" HARNESS.md)"
-assert_eq "manifest_tier: region path" "region" "$(manifest_tier "$MANIFEST" CLAUDE.md)"
+assert_eq "manifest_tier: region path" "region" "$(manifest_tier "$MANIFEST" AGENTS.md)"
 assert_eq "manifest_tier: listed ignore path" "ignore" "$(manifest_tier "$MANIFEST" README.md)"
 
 t_out=$(manifest_tier "$MANIFEST" nope/not-listed.md)
@@ -141,7 +141,7 @@ assert_nonzero "manifest_tier: line without a path -> non-zero" "$?"
 
 exp_sync=$(printf '%s\n' 'HARNESS.md' '.opencode/commands/task-init.md')
 assert_eq "manifest_paths sync" "$exp_sync" "$(manifest_paths "$MANIFEST" sync)"
-exp_region=$(printf '%s\n' 'CLAUDE.md' '.gitignore')
+exp_region=$(printf '%s\n' 'AGENTS.md' '.gitignore')
 assert_eq "manifest_paths region" "$exp_region" "$(manifest_paths "$MANIFEST" region)"
 exp_ignore=$(printf '%s\n' 'README.md' 'VERSION')
 assert_eq "manifest_paths ignore" "$exp_ignore" "$(manifest_paths "$MANIFEST" ignore)"
@@ -354,11 +354,11 @@ setup_sync_fixture() {
   mkdir -p "$up/.opencode"
   cat > "$up/.opencode/harness-manifest" <<'EOF'
 sync   HARNESS.md
-region CLAUDE.md
+region AGENTS.md
 ignore README.md
 EOF
   printf 'UPSTREAM HARNESS v0.2.0\n' > "$up/HARNESS.md"
-  cat > "$up/CLAUDE.md" <<EOF
+  cat > "$up/AGENTS.md" <<EOF
 # upstream heading (not synced)
 $RB
 upstream managed block v0.2.0
@@ -377,7 +377,7 @@ EOF
   mkdir -p "$con/.opencode"
   printf 'sync HARNESS.md\n' > "$con/.opencode/harness-manifest"
   printf 'old consumer harness\n' > "$con/HARNESS.md"
-  cat > "$con/CLAUDE.md" <<EOF
+  cat > "$con/AGENTS.md" <<EOF
 # My Project
 project-owned intro line
 $RB
@@ -401,8 +401,8 @@ printf '%s\n' "$plan_out" | grep -q '0.1.0 -> 0.2.0'
 assert_ok "sync plan reports the version delta 0.1.0 -> 0.2.0" "$?"
 printf '%s\n' "$plan_out" | grep -Eq '^overwrite[[:space:]]+HARNESS.md$'
 assert_ok "sync plan lists HARNESS.md as an overwrite" "$?"
-printf '%s\n' "$plan_out" | grep -Eq '^splice[[:space:]]+CLAUDE.md$'
-assert_ok "sync plan lists CLAUDE.md as a splice" "$?"
+printf '%s\n' "$plan_out" | grep -Eq '^splice[[:space:]]+AGENTS.md$'
+assert_ok "sync plan lists AGENTS.md as a splice" "$?"
 assert_eq "sync plan writes nothing (clean tree)" "" "$(git -C "$CON" status --porcelain)"
 assert_eq "sync plan leaves HARNESS.md untouched" "old consumer harness" "$(cat "$CON/HARNESS.md")"
 
@@ -413,13 +413,13 @@ CON2=${FIX2#*|}
 (cd "$CON2" && cmd_sync_pull) >/dev/null 2>&1
 assert_ok "cmd_sync_pull exits 0" "$?"
 assert_eq "pull overwrites the sync file from upstream" "UPSTREAM HARNESS v0.2.0" "$(cat "$CON2/HARNESS.md")"
-grep -q '^upstream managed block v0.2.0$' "$CON2/CLAUDE.md"
-assert_ok "pull splices the upstream managed block into CLAUDE.md" "$?"
-grep -q '^project-owned intro line$' "$CON2/CLAUDE.md"
+grep -q '^upstream managed block v0.2.0$' "$CON2/AGENTS.md"
+assert_ok "pull splices the upstream managed block into AGENTS.md" "$?"
+grep -q '^project-owned intro line$' "$CON2/AGENTS.md"
 assert_ok "pull preserves the project-owned line before the region" "$?"
-grep -q '^project-owned outro line$' "$CON2/CLAUDE.md"
+grep -q '^project-owned outro line$' "$CON2/AGENTS.md"
 assert_ok "pull preserves the project-owned line after the region" "$?"
-grep -q 'stale managed block' "$CON2/CLAUDE.md"
+grep -q 'stale managed block' "$CON2/AGENTS.md"
 assert_nonzero "pull replaces the stale managed block" "$?"
 assert_eq "pull updates the lock version" "0.2.0" "$(lock_read "$CON2/.opencode/harness.lock" version)"
 assert_eq "pull records the upstream tag commit in the lock" \
