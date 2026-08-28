@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# harness — versioning + sync helper for the Claude Code harness template.
+# harness — versioning + sync helper for the OpenCode harness template.
 #
 # Single dispatcher with subcommands. The pure helper functions below are
 # sourceable (see the guard at the bottom) so tests/test.sh can unit-test them
@@ -307,7 +307,7 @@ cmd_release() {
 # the consumer's own tags. The upstream repo for push PRs is
 # $HARNESS_UPSTREAM_REPO (default the canonical template).
 
-HARNESS_UPSTREAM_REPO="${HARNESS_UPSTREAM_REPO:-HectorMtz22/claude-code-harness-template}"
+HARNESS_UPSTREAM_REPO="${HARNESS_UPSTREAM_REPO:-HectorMtz22/opencode-harness-template}"
 
 _sync_root() { git rev-parse --show-toplevel 2>/dev/null; }
 
@@ -364,14 +364,14 @@ cmd_sync_plan() {
   ref="refs/harness-remote/v$ver"
 
   manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/harness-manifest.XXXXXX")
-  if ! git -C "$root" show "$ref:.claude/harness-manifest" > "$manifest_tmp" 2>/dev/null; then
-    echo "harness: no .claude/harness-manifest at $ref" >&2
+  if ! git -C "$root" show "$ref:.opencode/harness-manifest" > "$manifest_tmp" 2>/dev/null; then
+    echo "harness: no .opencode/harness-manifest at $ref" >&2
     rm -f "$manifest_tmp"
     return 1
   fi
 
-  fromver=$(lock_read "$root/.claude/harness.lock" version 2>/dev/null) || fromver="(none)"
-  prevcommit=$(lock_read "$root/.claude/harness.lock" commit 2>/dev/null) || prevcommit=""
+  fromver=$(lock_read "$root/.opencode/harness.lock" version 2>/dev/null) || fromver="(none)"
+  prevcommit=$(lock_read "$root/.opencode/harness.lock" commit 2>/dev/null) || prevcommit=""
 
   echo "harness sync plan (remote: $remote)"
   echo "  version: $fromver -> $ver"
@@ -413,8 +413,8 @@ cmd_sync_pull() {
   ref="refs/harness-remote/v$ver"
 
   manifest_tmp=$(mktemp "${TMPDIR:-/tmp}/harness-manifest.XXXXXX")
-  if ! git -C "$root" show "$ref:.claude/harness-manifest" > "$manifest_tmp" 2>/dev/null; then
-    echo "harness: no .claude/harness-manifest at $ref" >&2
+  if ! git -C "$root" show "$ref:.opencode/harness-manifest" > "$manifest_tmp" 2>/dev/null; then
+    echo "harness: no .opencode/harness-manifest at $ref" >&2
     rm -f "$manifest_tmp"
     return 1
   fi
@@ -422,7 +422,7 @@ cmd_sync_pull() {
   # A file the consumer customized since the last sync must never be clobbered:
   # read the baseline commit from the lock and skip any sync file that no longer
   # matches it (see _sync_locally_modified).
-  prevcommit=$(lock_read "$root/.claude/harness.lock" commit 2>/dev/null) || prevcommit=""
+  prevcommit=$(lock_read "$root/.opencode/harness.lock" commit 2>/dev/null) || prevcommit=""
 
   # sync tier: overwrite wholesale from the tag — EXCEPT files the consumer has
   # locally modified, which are kept. Write to a temp file first and mv into
@@ -466,7 +466,7 @@ cmd_sync_pull() {
   done
 
   sha=$(git -C "$root" rev-parse "$ref^{commit}")
-  lock_write "$root/.claude/harness.lock" "$ver" "$sha" "$remote"
+  lock_write "$root/.opencode/harness.lock" "$ver" "$sha" "$remote"
   rm -f "$manifest_tmp"
 
   echo "Pulled harness v$ver from '$remote'"
@@ -482,7 +482,7 @@ cmd_sync_push() {
     return 2
   fi
   root=$(_sync_root) || { echo "harness: not inside a git repository" >&2; return 1; }
-  manifest="$root/.claude/harness-manifest"
+  manifest="$root/.opencode/harness-manifest"
   if [ ! -f "$manifest" ]; then
     echo "harness: manifest not found: $manifest" >&2
     return 1

@@ -229,18 +229,18 @@ assert_eq "VERSION untouched after tag-exists refusal" "0.1.0" "$(cat "$REPO4/VE
 assert_eq "no partial release commit after tag-exists refusal" "$before_head" "$(git -C "$REPO4" rev-parse HEAD)"
 
 # ---------------------------------------------------------------------------
-# The repo's real .claude/harness-manifest is well-formed
+# The repo's real .opencode/harness-manifest is well-formed
 # ---------------------------------------------------------------------------
-REAL_MANIFEST="$ROOT/.claude/harness-manifest"
+REAL_MANIFEST="$ROOT/.opencode/harness-manifest"
 manifest_paths "$REAL_MANIFEST" sync >/dev/null 2>&1
 assert_ok "real manifest parses without error" "$?"
 assert_eq "real manifest: bin/harness is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" bin/harness)"
-assert_eq "real manifest: CLAUDE.md is region" "region" "$(manifest_tier "$REAL_MANIFEST" CLAUDE.md)"
+assert_eq "real manifest: AGENTS.md is region" "region" "$(manifest_tier "$REAL_MANIFEST" AGENTS.md)"
 assert_eq "real manifest: README.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" README.md)"
-assert_eq "real manifest: harness-release.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-release.md)"
+assert_eq "real manifest: harness-release.md is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .opencode/commands/harness-release.md)"
 assert_eq "real manifest: tests/test.sh is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" tests/test.sh)"
-assert_eq "real manifest: harness-sync.md is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" .claude/commands/harness-sync.md)"
-assert_eq "real manifest: harness.lock is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .claude/harness.lock)"
+assert_eq "real manifest: harness-sync.md is sync" "sync" "$(manifest_tier "$REAL_MANIFEST" .opencode/commands/harness-sync.md)"
+assert_eq "real manifest: harness.lock is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" .opencode/harness.lock)"
 assert_eq "real manifest: LICENSE is ignore" "ignore" "$(manifest_tier "$REAL_MANIFEST" LICENSE)"
 
 # ---------------------------------------------------------------------------
@@ -351,8 +351,8 @@ setup_sync_fixture() {
   git -C "$up" config user.email t@e.com
   git -C "$up" config user.name T
   git -C "$up" config commit.gpgsign false
-  mkdir -p "$up/.claude"
-  cat > "$up/.claude/harness-manifest" <<'EOF'
+  mkdir -p "$up/.opencode"
+  cat > "$up/.opencode/harness-manifest" <<'EOF'
 sync   HARNESS.md
 region CLAUDE.md
 ignore README.md
@@ -374,8 +374,8 @@ EOF
   git -C "$con" config user.name T
   git -C "$con" config commit.gpgsign false
   git -C "$con" remote add harness "$up"
-  mkdir -p "$con/.claude"
-  printf 'sync HARNESS.md\n' > "$con/.claude/harness-manifest"
+  mkdir -p "$con/.opencode"
+  printf 'sync HARNESS.md\n' > "$con/.opencode/harness-manifest"
   printf 'old consumer harness\n' > "$con/HARNESS.md"
   cat > "$con/CLAUDE.md" <<EOF
 # My Project
@@ -385,7 +385,7 @@ stale managed block
 $RE
 project-owned outro line
 EOF
-  lock_write "$con/.claude/harness.lock" 0.1.0 deadbeef harness
+  lock_write "$con/.opencode/harness.lock" 0.1.0 deadbeef harness
   git -C "$con" add -A
   git -C "$con" commit -q -m "consumer baseline"
 
@@ -421,9 +421,9 @@ grep -q '^project-owned outro line$' "$CON2/CLAUDE.md"
 assert_ok "pull preserves the project-owned line after the region" "$?"
 grep -q 'stale managed block' "$CON2/CLAUDE.md"
 assert_nonzero "pull replaces the stale managed block" "$?"
-assert_eq "pull updates the lock version" "0.2.0" "$(lock_read "$CON2/.claude/harness.lock" version)"
+assert_eq "pull updates the lock version" "0.2.0" "$(lock_read "$CON2/.opencode/harness.lock" version)"
 assert_eq "pull records the upstream tag commit in the lock" \
-  "$(git -C "$UP2" rev-parse v0.2.0^{commit})" "$(lock_read "$CON2/.claude/harness.lock" commit)"
+  "$(git -C "$UP2" rev-parse v0.2.0^{commit})" "$(lock_read "$CON2/.opencode/harness.lock" commit)"
 
 # --- sync pull refuses on a dirty tree ---
 FIX3=$(setup_sync_fixture)
@@ -440,8 +440,8 @@ git -C "$GUP" init -q
 git -C "$GUP" config user.email t@e.com
 git -C "$GUP" config user.name T
 git -C "$GUP" config commit.gpgsign false
-mkdir -p "$GUP/.claude"
-cat > "$GUP/.claude/harness-manifest" <<'EOF'
+mkdir -p "$GUP/.opencode"
+cat > "$GUP/.opencode/harness-manifest" <<'EOF'
 sync HARNESS.md
 sync GHOST.md
 EOF
@@ -455,8 +455,8 @@ git -C "$GCON" config user.email t@e.com
 git -C "$GCON" config user.name T
 git -C "$GCON" config commit.gpgsign false
 git -C "$GCON" remote add harness "$GUP"
-mkdir -p "$GCON/.claude"
-printf 'sync HARNESS.md\n' > "$GCON/.claude/harness-manifest"
+mkdir -p "$GCON/.opencode"
+printf 'sync HARNESS.md\n' > "$GCON/.opencode/harness-manifest"
 printf 'old harness\n' > "$GCON/HARNESS.md"
 printf 'PRECIOUS local content\n' > "$GCON/GHOST.md"
 git -C "$GCON" add -A
@@ -476,8 +476,8 @@ git -C "$MUP" init -q
 git -C "$MUP" config user.email t@e.com
 git -C "$MUP" config user.name T
 git -C "$MUP" config commit.gpgsign false
-mkdir -p "$MUP/.claude"
-printf 'sync HARNESS.md\nsync KEEPME.md\n' > "$MUP/.claude/harness-manifest"
+mkdir -p "$MUP/.opencode"
+printf 'sync HARNESS.md\nsync KEEPME.md\n' > "$MUP/.opencode/harness-manifest"
 printf 'harness v1\n' > "$MUP/HARNESS.md"
 printf 'base\n' > "$MUP/KEEPME.md"
 git -C "$MUP" add -A
@@ -495,11 +495,11 @@ git -C "$MCON" config user.email t@e.com
 git -C "$MCON" config user.name T
 git -C "$MCON" config commit.gpgsign false
 git -C "$MCON" remote add harness "$MUP"
-mkdir -p "$MCON/.claude"
-printf 'sync HARNESS.md\nsync KEEPME.md\n' > "$MCON/.claude/harness-manifest"
+mkdir -p "$MCON/.opencode"
+printf 'sync HARNESS.md\nsync KEEPME.md\n' > "$MCON/.opencode/harness-manifest"
 printf 'harness v1 LOCALLY EDITED\n' > "$MCON/HARNESS.md"   # customized since baseline
 printf 'base\n' > "$MCON/KEEPME.md"                          # untouched since baseline
-lock_write "$MCON/.claude/harness.lock" 0.1.0 "$MBASE" harness
+lock_write "$MCON/.opencode/harness.lock" 0.1.0 "$MBASE" harness
 git -C "$MCON" add -A
 git -C "$MCON" commit -q -m con
 
@@ -515,7 +515,7 @@ assert_ok "sync plan marks an unmodified sync file as overwrite" "$?"
 assert_ok "cmd_sync_pull (keep-modified) exits 0" "$?"
 assert_eq "pull keeps a locally-modified sync file" "harness v1 LOCALLY EDITED" "$(cat "$MCON/HARNESS.md")"
 assert_eq "pull overwrites an unmodified sync file" "base2" "$(cat "$MCON/KEEPME.md")"
-assert_eq "pull advances the lock even when a file was kept" "0.2.0" "$(lock_read "$MCON/.claude/harness.lock" version)"
+assert_eq "pull advances the lock even when a file was kept" "0.2.0" "$(lock_read "$MCON/.opencode/harness.lock" version)"
 
 # ---------------------------------------------------------------------------
 # cmd_sync_push — branch + commit managed diffs, hand off to gh (seam stubbed)
@@ -533,8 +533,8 @@ setup_push_repo() {
   git -C "$con" config user.email t@e.com
   git -C "$con" config user.name T
   git -C "$con" config commit.gpgsign false
-  mkdir -p "$con/.claude"
-  cat > "$con/.claude/harness-manifest" <<'EOF'
+  mkdir -p "$con/.opencode"
+  cat > "$con/.opencode/harness-manifest" <<'EOF'
 sync   HARNESS.md
 ignore README.md
 EOF
