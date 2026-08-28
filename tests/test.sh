@@ -104,7 +104,7 @@ MANIFEST=$(mktmp)
 cat > "$MANIFEST" <<'EOF'
 # harness manifest fixture
 sync   HARNESS.md
-sync   .claude/commands/task-init.md
+sync   .opencode/commands/task-init.md
 
 region CLAUDE.md
 region .gitignore
@@ -139,7 +139,7 @@ EOF
 manifest_tier "$MANIFEST_MISSING_PATH" HARNESS.md >/dev/null 2>&1
 assert_nonzero "manifest_tier: line without a path -> non-zero" "$?"
 
-exp_sync=$(printf '%s\n' 'HARNESS.md' '.claude/commands/task-init.md')
+exp_sync=$(printf '%s\n' 'HARNESS.md' '.opencode/commands/task-init.md')
 assert_eq "manifest_paths sync" "$exp_sync" "$(manifest_paths "$MANIFEST" sync)"
 exp_region=$(printf '%s\n' 'CLAUDE.md' '.gitignore')
 assert_eq "manifest_paths region" "$exp_region" "$(manifest_paths "$MANIFEST" region)"
