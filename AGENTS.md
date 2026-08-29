@@ -1,35 +1,118 @@
 # Agent workflow for this repo
 
 This file captures how feature work is done in this repo by automated coding
-agents (Claude Code with the `superpowers` plugin and an MCP server for your
-issue tracker). It's a recipe, not a rule. Tracker coordinates live in
-`.claude/tracker.md` — run `/harness-setup` to create it. **Always use
-superpowers** — invoke the named skill at each stage. See [`HARNESS.md`](HARNESS.md)
-for the full TDD detail.
+agents (OpenCode with the `superpowers` plugin and an MCP server for your issue
+tracker). It's a recipe, not a rule. Tracker coordinates live in
+`.opencode/tracker.md` — run `/harness-setup` to create it. **Always use
+superpowers** — invoke the named skill at each stage. See
+[`HARNESS.md`](HARNESS.md) for the full TDD detail.
 
 Four slash commands wrap the loop — a planning pair and a building pair, each
 scaling from a single task to a whole epic/backlog: **`/task-init`** /
 **`/issues-init`** (front half) and **`/task-implement`** / **`/task-run`**
 (back half).
 
+## What this is
+
+`<repo>` is a **multi-project monorepo**. Each top-level directory is a
+self-contained project with its own dependencies, README, and tests. There is
+no shared package — keep projects independent.
+
+| Project | What | Stack | Tests |
+|---|---|---|---|
+| [`<project-a>/`](<project-a>/) | <one-line description> | <stack> | `<test command>` |
+| [`<project-b>/`](<project-b>/) | <one-line description> | <stack> | `<test command>` |
+
+Pick one project as the **gold-standard layout** and mirror it when another
+project grows past a single script. A typical layout:
+
+```
+src/<pkg>/
+  features/<feature>/{service,command,screen}.py   # one folder per feature
+  shared/{...}.py                                   # cross-feature helpers
+tests/
+  features/<feature>/test_*.py                      # mirrors src tree
+  shared/test_*.py
+  conftest.py                                        # fixtures
+```
+
+## Core principles
+
+1. **Simplest thing that works.** Prefer the smallest change that satisfies the
+   test. No speculative abstraction, no new dependency without a reason.
+2. **TDD, always.** Red → green → refactor. New behavior starts with a failing
+   test. See [`HARNESS.md`](HARNESS.md).
+3. **Verify before claiming done.** Run the tests (or the actual command) and
+   report real output. Never say "done" on an unrun change.
+4. **Keep projects isolated.** Don't reach across project boundaries.
+5. **Match the surrounding code** — naming, comment density, idioms.
+
+## Per-project commands
+
+```bash
+# <project-a>
+<test command>          # test
+<run command>           # run
+```
+
+## Conventions
+
+- **Commits:** [Conventional Commits](https://www.conventionalcommits.org/),
+  scoped per project: `feat(<project>): …`, `fix(<project>): …`,
+  `test(<project>): …`, `chore: …`. One project per commit where possible.
+- **PRs:** one feature per PR; opened once the branch is verified, green,
+  committed, and clean (see [`HARNESS.md`](HARNESS.md)). Code-review *fixes*
+  wait for the user.
+- **Branch off the default branch first — never commit to it directly.** Commit
+  at green points so the branch is PR-ready.
+
+<!-- HARNESS:BEGIN -->
+<!-- Managed by the harness; `harness sync pull` replaces this block. Keep your
+     project-specific content above this marker. -->
+## Workflow & agents
+
+The full loop (brainstorm → spec → issue(s) → worktree → TDD → verify → review →
+PR) lives in [`HARNESS.md`](HARNESS.md), wrapped by four commands — a planning
+pair, **`/task-init`** (one task → issue(s)) and **`/issues-init`** (one epic →
+many linked issues), and a building pair, **`/task-implement`** (issues you name
+→ PRs) and **`/task-run`** (the whole backlog, auto-ordered → PRs). Key rules:
+
+- **Always use superpowers.** Invoke the named skill at each stage via the
+  OpenCode `skill` tool (`brainstorming`, `using-git-worktrees`,
+  `test-driven-development`, `dispatching-parallel-agents`,
+  `verification-before-completion`, `requesting-code-review`).
+  **Report findings, don't auto-fix.**
+- **Specs and plans are local-only** under `docs/superpowers/` (gitignored).
+  **Never commit them.** The committed record is the code + PR.
+- **Issues live in the tracker** (configured in `.opencode/tracker.md` — run
+  `/harness-setup` to create it) — project `project_code`. Each issue gets a
+  project label and a type label (`feat`/`fix`/`refactor`/`test`/`docs`/`chore`);
+  states go `Todo → In Progress → In Review (PR open) → Done (merged)`. Not in
+  local files.
+- **Always use worktrees** under `.worktrees/` (gitignored) for implementation;
+  never work in the main checkout. Multiple issues run as parallel agents, one
+  worktree each.
+- **Conventional commits always**, scoped per sub-project.
+
 ## TL;DR
 
-1. **`/task-init`** runs `superpowers:brainstorming` → a design at
+1. **`/task-init`** runs the `brainstorming` skill → a design at
    `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (gitignored, local-only)
-   → files **issue(s)** in the configured project (`project_code`) (state `Todo`, project +
-   type labels). For a broad goal, **`/issues-init`** does the same at epic scale:
-   it decomposes into many PR-sized issues, files them under a parent grouping,
-   and sets **blocks/blocked-by** relations so the backlog is pre-ordered.
+   → files **issue(s)** in the configured project (`project_code`) (state `Todo`,
+   project + type labels). For a broad goal, **`/issues-init`** does the same at
+   epic scale: it decomposes into many PR-sized issues, files them under a parent
+   grouping, and sets **blocks/blocked-by** relations so the backlog is
+   pre-ordered.
 2. **`/task-implement [project_code-…]`** picks up the issue(s) and, for each,
    moves it to `In Progress` and **creates a worktree** under `.worktrees/<topic>/`
-   on a new branch (gitignored) via `superpowers:using-git-worktrees`. To run the
+   on a new branch (gitignored) via the `using-git-worktrees` skill. To run the
    backlog instead of naming issues, **`/task-run`** derives parallel/sequential
    batches (from those relations + file-overlap), then drives this same machinery
    batch by batch.
 3. **Dispatch a subagent** to implement inside that worktree, following TDD.
-   Multiple issues → `superpowers:dispatching-parallel-agents`, one agent per
-   worktree, in a single message.
-4. **Run `superpowers:requesting-code-review`** on each branch.
+   Multiple issues → `dispatching-parallel-agents`, one agent per worktree, in a
+   single message.
+4. **Run `requesting-code-review`** on each branch.
 5. **Report findings, ask before fixing.**
 6. **Open a PR automatically** once the branch is verified, green, committed, and
    clean (no Important+ findings remain), then move the issue to **In Review**
@@ -44,8 +127,8 @@ the diff without context pollution.
 
 When two or more independent tasks are dispatched in parallel, each gets its own
 worktree, branch, and PR, so the diffs never tangle. Worktree setup goes through
-`superpowers:using-git-worktrees`; implementation **always** happens in a
-worktree, never in the main checkout.
+`using-git-worktrees`; implementation **always** happens in a worktree, never in
+the main checkout.
 
 ```bash
 git worktree add -b <type>/<scope>-<topic> .worktrees/<topic> <default-branch>
@@ -55,8 +138,9 @@ git worktree add -b <type>/<scope>-<topic> .worktrees/<topic> <default-branch>
 
 ## Issue tracking
 
-Issues live in the tracker (configured in `.claude/tracker.md`), not in local files. Project `project_code`.
-`/task-init` files them; `/task-implement` reads and advances them.
+Issues live in the tracker (configured in `.opencode/tracker.md`), not in local
+files. Project `project_code`. `/task-init` files them; `/task-implement` reads
+and advances them.
 
 - **States:** `Todo` → `In Progress` → `In Review` (PR open) → `Done` (merged)
   (resolve ids at runtime; create any your tracker lacks — e.g. Plane ships
@@ -77,7 +161,7 @@ the durable record.
 ## Subagents
 
 For an implementation task that's bigger than a single edit, use
-`superpowers:subagent-driven-development` to dispatch a subagent with:
+`subagent-driven-development` to dispatch a subagent with:
 
 - A pointer to its **issue** and the linked design doc.
 - The exact worktree path and a "do not touch the main checkout or sibling
@@ -85,18 +169,18 @@ For an implementation task that's bigger than a single edit, use
 - An explicit code map (files to touch).
 - A "report back briefly" instruction (so the parent's context isn't flooded).
 
-When tasks run in parallel, use `superpowers:dispatching-parallel-agents`:
-dispatch one subagent per worktree in a single message. Keep them on disjoint
-files; sequence anything that overlaps.
+When tasks run in parallel, use `dispatching-parallel-agents`: dispatch one
+subagent per worktree in a single message. Keep them on disjoint files; sequence
+anything that overlaps.
 
-The parent verifies the diff and test results
-(`superpowers:verification-before-completion`) before moving on.
+The parent verifies the diff and test results (`verification-before-completion`)
+before moving on.
 
 ## Code review
 
-Always run `superpowers:requesting-code-review` before opening a PR. Report
-findings to the user grouped by severity. **Do not auto-fix** — the user decides
-which items are in scope.
+Always run `requesting-code-review` before opening a PR. Report findings to the
+user grouped by severity. **Do not auto-fix** — the user decides which items are
+in scope.
 
 ## Commit messages
 
@@ -118,10 +202,10 @@ driven by the tested `bin/harness` helper behind two thin commands:
 `/harness-release` (template-only — bump `VERSION`/`CHANGELOG.md`, tag `vX.Y.Z`)
 and `/harness-sync` (in a consumer — `plan`/`pull`/`push`).
 
-`.claude/harness-manifest` tiers every path: `sync` (overwritten on pull),
+`.opencode/harness-manifest` tiers every path: `sync` (overwritten on pull),
 `region` (only the `HARNESS:BEGIN…END` block is replaced, project content kept),
 `ignore` (never synced). A pull refuses on a dirty tree and writes the synced
-state to `.claude/harness.lock`; a push branches, commits only the managed
+state to `.opencode/harness.lock`; a push branches, commits only the managed
 files, and opens a PR upstream. **Plan before every pull** and show the user.
 Don't reimplement any of this in the markdown commands — the mechanics (semver,
 manifest, region splice, lock) are unit-tested in `bin/harness`.
@@ -130,9 +214,9 @@ manifest, region splice, lock) are unit-tested in `bin/harness`.
 
 ```
 .worktrees/                              # gitignored, agent worktrees
-.claude/commands/                        # /task-init, /issues-init, /task-implement, /task-run, /harness-* (committed)
-.claude/harness-manifest                 # path → sync/region/ignore tier
-.claude/harness.lock                     # consumer-only: which harness version is installed
+.opencode/commands/                      # /task-init, /issues-init, /task-implement, /task-run, /harness-* (committed)
+.opencode/harness-manifest               # path → sync/region/ignore tier
+.opencode/harness.lock                   # consumer-only: which harness version is installed
 bin/harness                              # tested helper: release + sync mechanics
 tests/test.sh                            # bin/harness test suite
 VERSION  CHANGELOG.md                    # harness semver + changelog
@@ -141,3 +225,4 @@ docs/
     specs/YYYY-MM-DD-<topic>-design.md   # design docs (issues live in the tracker, not on disk)
 <project>/                               # actual project
 ```
+<!-- HARNESS:END -->

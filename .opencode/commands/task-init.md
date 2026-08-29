@@ -1,6 +1,5 @@
 ---
 description: Brainstorm a new task, write a local spec, and file issue(s) in the tracker
-argument-hint: [short description of the task]
 ---
 
 # /task-init — start a new task
@@ -14,25 +13,25 @@ Task description (may be empty — ask if so): **$ARGUMENTS**
 
 ## Tracker coordinates
 
-Read these from `.claude/tracker.md` (written by `/harness-setup`):
+Read these from `.opencode/tracker.md` (written by `/harness-setup`):
 `tracker`, `mcp_prefix`, `project_code`, `project_id`. If the file is missing,
 tell the user to run `/harness-setup` first.
 
 - Project = `project_code` (pass `project_id` to MCP tools that need it).
 - Resolve states and labels **by name at runtime** — don't hardcode UUIDs:
-  - `<mcp_prefix>__list_states` → pick the state named **"Todo"**.
-  - `<mcp_prefix>__list_labels` → map label names to IDs.
+  - `<mcp_prefix>_state` (`action: list`) → pick the state named **"Todo"**.
+  - `<mcp_prefix>_label` (`action: list`) → map label names to IDs.
 
 ## Steps
 
-1. **Brainstorm.** Invoke `superpowers:brainstorming` and design the change with
+1. **Brainstorm.** Invoke the `brainstorming` skill (via the `skill` tool) and design the change with
    the user. Do not skip this even if the task seems small — the spec can be
    short. The brainstorming skill writes the spec to
    `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` (local, gitignored) and
    gets the user's approval. Let it run its full flow.
 
 2. **Plan into PR-sized chunks.** If the spec is bigger than one PR, use
-   `superpowers:writing-plans` and split it into independent, PR-sized chunks —
+   the `writing-plans` skill and split it into independent, PR-sized chunks —
    one issue each (this is what lets `/task-implement` run them in parallel). A
    single-PR task is just one issue.
 

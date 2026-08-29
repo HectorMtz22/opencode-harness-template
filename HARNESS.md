@@ -1,10 +1,11 @@
 # Development Harness (TDD)
 
-The repeatable loop for shipping a change in this repo. It assumes Claude Code
-with the `superpowers` plugin and your tracker (configured in `.claude/tracker.md`,
-reached via an MCP server). It complements [`AGENTS.md`](AGENTS.md) (the *why* of
-worktrees/specs) with the *how* of TDD and issue tracking. Coordinates live in
-`.claude/tracker.md` — run `/harness-setup` to create it.
+The repeatable loop for shipping a change in this repo. It assumes OpenCode
+with the `superpowers` plugin (declared in `opencode.jsonc`) and your tracker
+(configured in `.opencode/tracker.md`, reached via an MCP server). It complements
+[`AGENTS.md`](AGENTS.md) (the *why* of worktrees/specs) with the *how* of TDD and
+issue tracking. Coordinates live in `.opencode/tracker.md` — run `/harness-setup`
+to create it.
 
 Optimize for the **simplest approach that passes a test**, and **verify every
 step with real output** before moving on. **Always use superpowers** — invoke
@@ -47,7 +48,7 @@ the code, the tracked issue, and the PR.
 Before the loop, configure and provision the tracker:
 
 1. **`/harness-setup`** — choose the tracker (default Plane); writes
-   `.claude/tracker.md`.
+   `.opencode/tracker.md`.
 2. **`/harness-bootstrap`** — create the project (if missing), the
    `Todo → In Progress → In Review → Done` states, the type labels, and the
    weekly (Mon→Sun) cycles. Idempotent — re-run to top up future cycles.
@@ -65,9 +66,9 @@ When unsure, treat it as non-trivial — a 10-line spec is cheap.
 
 ---
 
-## 1. Brainstorm (non-trivial only) — `superpowers:brainstorming`
+## 1. Brainstorm (non-trivial only) — `brainstorming`
 
-Run `/task-init`, which invokes `superpowers:brainstorming` to pressure-test the
+Run `/task-init`, which invokes the `brainstorming` skill to pressure-test the
 idea before any code. Goal: agree on the **simplest** approach and surface
 unknowns. The skill writes the spec and gets your approval.
 
@@ -106,10 +107,10 @@ issue ≈ one PR-sized chunk. Each issue gets:
 Use multiple independent issues to coordinate **parallel agents** — each agent
 owns one issue in its own worktree.
 
-## 4. Worktree — `superpowers:using-git-worktrees`
+## 4. Worktree — `using-git-worktrees`
 
 Implementation always happens in an isolated worktree so the main checkout stays
-clean. `/task-implement` uses `superpowers:using-git-worktrees`:
+clean. `/task-implement` uses the `using-git-worktrees` skill:
 
 ```bash
 git worktree add -b <type>/<scope>-<topic> .worktrees/<topic> <default-branch>
@@ -119,7 +120,7 @@ git worktree add -b <type>/<scope>-<topic> .worktrees/<topic> <default-branch>
 issues, create multiple worktrees and dispatch one agent each — they won't
 collide.
 
-## 5. TDD: Red → Green → Refactor — `superpowers:test-driven-development`
+## 5. TDD: Red → Green → Refactor — `test-driven-development`
 
 This is the core. **Never write production code without a failing test first.**
 
@@ -159,14 +160,14 @@ first** (the simplest one that fits):
 
 Don't expand untested scripts further without this.
 
-## 6. Verify for real — `superpowers:verification-before-completion`
+## 6. Verify for real — `verification-before-completion`
 
 Beyond green tests, run the actual command once to confirm end-to-end behavior.
 Report what you observed.
 
-## 7. Code review — always — `superpowers:requesting-code-review`
+## 7. Code review — always — `requesting-code-review`
 
-Run `superpowers:requesting-code-review` on the branch before any PR.
+Run the `requesting-code-review` skill on the branch before any PR.
 
 - Report findings to the user **grouped by severity** (Critical / Important /
   Minor).
@@ -185,14 +186,14 @@ the user (§7).
 
 ---
 
-## Parallel agents — `superpowers:dispatching-parallel-agents`
+## Parallel agents — `dispatching-parallel-agents`
 
 For work that splits cleanly, `/task-implement` runs issues concurrently:
 
 1. `/task-init` files N independent issues (disjoint files).
-2. Create N worktrees (one per issue) via `superpowers:using-git-worktrees`.
+2. Create N worktrees (one per issue) via the `using-git-worktrees` skill.
 3. Dispatch one subagent per worktree in a **single message** so they run
-   concurrently (`superpowers:dispatching-parallel-agents` +
+   concurrently (`dispatching-parallel-agents` +
    `subagent-driven-development`). Each agent gets: its issue + spec, its
    worktree path, a "don't touch the main checkout or other worktrees"
    instruction, the code map, and a "report back briefly" instruction.
@@ -220,19 +221,19 @@ commands drive it.
 - **Cut a version (template repo only)** — `/harness-release <major|minor|patch>`
   bumps `VERSION`, rolls the `CHANGELOG.md` **Unreleased** section into a dated
   heading, commits, and tags `vX.Y.Z`.
-- **The manifest** — `.claude/harness-manifest` classifies every path:
+- **The manifest** — `.opencode/harness-manifest` classifies every path:
   - `sync` — harness-owned; overwritten wholesale on a pull, **except** files you
     customized since the last sync (diffed against the locked baseline commit),
     which are **kept**.
   - `region` — mixed; only the `HARNESS:BEGIN…END` block is replaced, so your
-    project content (the `CLAUDE.md` project table, extra `.gitignore` lines)
+    project content (the `AGENTS.md` project table, extra `.gitignore` lines)
     survives.
   - `ignore` — template-only or project-owned; never synced.
 - **Pull updates into a consumer** — `/harness-sync` (needs the template as a
   git remote named `harness`). Always **plan first** (`bin/harness sync plan` —
   a read-only dry run of every overwrite/splice + the version delta), show the
   user, then `pull`. Pull refuses on a dirty tree and records the synced
-  `version`/`commit`/`remote` in `.claude/harness.lock` (commit that file).
+  `version`/`commit`/`remote` in `.opencode/harness.lock` (commit that file).
 - **Push a local harness fix back** — `/harness-sync push <topic>` branches,
   commits **only** the managed files, and opens a PR against the template (falls
   back to printing the manual `gh` command if `gh` is absent).

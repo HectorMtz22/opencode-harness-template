@@ -1,32 +1,31 @@
 ---
 description: Provision the tracker — create project, states, type labels, and weekly cycles (idempotent)
-argument-hint: (none; interactive — asks cycle count)
 ---
 
 # /harness-bootstrap — provision the tracker
 
-**Live, idempotent** setup. Reads `.claude/tracker.md` and creates anything the
+**Live, idempotent** setup. Reads `.opencode/tracker.md` and creates anything the
 harness assumes but that doesn't exist yet. Safe to re-run. Run `/harness-setup`
-first if `.claude/tracker.md` is missing.
+first if `.opencode/tracker.md` is missing.
 
 ## Read config
 
-Load `.claude/tracker.md`: `tracker`, `mcp_prefix`, `project_code`, `project_id`,
+Load `.opencode/tracker.md`: `tracker`, `mcp_prefix`, `project_code`, `project_id`,
 `has_cycles`, `cycle_length`, `cycle_anchor`. Tool names below use
-`<mcp_prefix>` (Plane default: `mcp__plane`).
+`<mcp_prefix>` (Plane default: `plane`).
 
 ## Steps (each is "check, then create only if missing")
 
-1. **Project.** `<mcp_prefix>__list_projects`. If no project matches
-   `project_code`/name, `<mcp_prefix>__create_project`. Record `project_id` back
-   into `.claude/tracker.md` if it was unset.
+1. **Project.** `<mcp_prefix>_project` (`action: list`). If no project matches
+   `project_code`/name, `<mcp_prefix>_project` (`action: create`). Record `project_id` back
+   into `.opencode/tracker.md` if it was unset.
 
-2. **States.** `<mcp_prefix>__list_states`. Ensure these exist (create the
-   missing ones via `<mcp_prefix>__create_state`):
+2. **States.** `<mcp_prefix>_state` (`action: list`). Ensure these exist (create the
+   missing ones via `<mcp_prefix>_state` (`action: create`):
    **Todo**, **In Progress**, **In Review**, **Done**.
 
-3. **Type labels.** `<mcp_prefix>__list_labels`. Ensure these exist (create
-   missing via `<mcp_prefix>__create_label`): `feat`, `fix`, `refactor`, `test`,
+3. **Type labels.** `<mcp_prefix>_label` (`action: list`). Ensure these exist (create
+   missing via `<mcp_prefix>_label` (`action: create`): `feat`, `fix`, `refactor`, `test`,
    `docs`, `chore`. (Per-sub-project labels stay on-demand in `/task-init`.)
 
 4. **Cycles** — only if `has_cycles` is `true`:
@@ -37,9 +36,9 @@ Load `.claude/tracker.md`: `tracker`, `mcp_prefix`, `project_code`, `project_id`
      **Monday → Sunday**, consecutive.
    - For each i in 1..N: name `Cycle <i> (<start> → <end>)`,
      `start = anchor + (i-1) weeks`, `end = start + 6 days`.
-   - `<mcp_prefix>__list_cycles` first; **create only cycles whose date range
+   - `<mcp_prefix>_cycle` (`action: list`) first; **create only cycles whose date range
      doesn't already exist** (top-up, never duplicate) via
-     `<mcp_prefix>__create_cycle`.
+     `<mcp_prefix>_cycle` (`action: create`).
    - If `has_cycles` is `false` (e.g. GitHub): skip cycles, or create equivalent
      milestones if the tracker supports them, and note what was done.
 

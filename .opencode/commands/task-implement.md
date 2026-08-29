@@ -1,6 +1,5 @@
 ---
 description: Implement tracker issue(s) in worktrees with parallel agents, TDD, review, and PR
-argument-hint: [project_code-12 project_code-13 …] (optional; lists Todo issues if omitted)
 ---
 
 # /task-implement — implement issue(s)
@@ -14,12 +13,12 @@ Requested issues (may be empty): **$ARGUMENTS**
 
 ## Tracker coordinates
 
-Read these from `.claude/tracker.md` (written by `/harness-setup`):
+Read these from `.opencode/tracker.md` (written by `/harness-setup`):
 `tracker`, `mcp_prefix`, `project_code`, `project_id`. If the file is missing,
 tell the user to run `/harness-setup` first.
 
 - Project = `project_code` (pass `project_id` to MCP tools that need it).
-- Resolve states **by name at runtime** via `<mcp_prefix>__list_states`:
+- Resolve states **by name at runtime** via `<mcp_prefix>_state` (`action: list`):
   **"Todo"**, **"In Progress"**, **"In Review"**, **"Done"**. If your tracker
   lacks one (e.g. Plane has no **"In Review"**), create it once before running
   this command.
@@ -35,14 +34,14 @@ tell the user to run `/harness-setup` first.
 
 2. **Move each issue to In Progress** (`state` = the In Progress id).
 
-3. **One worktree per issue.** Use `superpowers:using-git-worktrees`. Branch
+3. **One worktree per issue.** Use the `using-git-worktrees` skill. Branch
    name = `<type>/<scope>-<topic>` from the issue's type + project labels, e.g.
    `feat/<project>-range-presets`. Worktrees go under `.worktrees/` (gitignored).
 
 4. **Dispatch implementation agents.**
-   - Use `superpowers:subagent-driven-development`; each subagent follows
-     `superpowers:test-driven-development` (red → green → refactor, full suite).
-   - **More than one issue → `superpowers:dispatching-parallel-agents`**: dispatch
+   - Use the `subagent-driven-development` skill; each subagent follows
+     `test-driven-development` (red → green → refactor, full suite).
+   - **More than one issue → `dispatching-parallel-agents`**: dispatch
      all agents in a **single message** so they run concurrently, one per
      worktree. Only parallelize issues that touch **disjoint files**; if two
      issues overlap a module, sequence them instead.
@@ -50,10 +49,10 @@ tell the user to run `/harness-setup` first.
      touch the main checkout or sibling worktrees", and "report back briefly".
 
 5. **Verify (parent).** For each branch run
-   `superpowers:verification-before-completion`: inspect the diff and run the
+   the `verification-before-completion` skill: inspect the diff and run the
    full project suite. Confirm real green output before continuing.
 
-6. **Code review (parent).** Run `superpowers:requesting-code-review` per branch.
+6. **Code review (parent).** Run the `requesting-code-review` skill per branch.
    **Report findings to the user grouped by severity (Critical / Important /
    Minor) and ask which to fix — do NOT auto-fix.** Apply only what the user
    approves, then re-review.
