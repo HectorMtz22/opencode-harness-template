@@ -10,6 +10,8 @@ rolls the **Unreleased** section below into a dated version heading and tags
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-28
+
 ### Changed
 
 - Ported the harness to OpenCode: commands now live in `.opencode/commands/`,
