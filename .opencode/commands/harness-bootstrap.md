@@ -21,11 +21,11 @@ Load `.opencode/tracker.md`: `tracker`, `mcp_prefix`, `project_code`, `project_i
    into `.opencode/tracker.md` if it was unset.
 
 2. **States.** `<mcp_prefix>_state` (`action: list`). Ensure these exist (create the
-   missing ones via `<mcp_prefix>_state` (`action: create`)):
+   missing ones via `<mcp_prefix>_state` (`action: create`):
    **Todo**, **In Progress**, **In Review**, **Done**.
 
 3. **Type labels.** `<mcp_prefix>_label` (`action: list`). Ensure these exist (create
-   missing via `<mcp_prefix>_label` (`action: create`)): `feat`, `fix`, `refactor`, `test`,
+   missing via `<mcp_prefix>_label` (`action: create`): `feat`, `fix`, `refactor`, `test`,
    `docs`, `chore`. (Per-sub-project labels stay on-demand in `/task-init`.)
 
 4. **Cycles** — only if `has_cycles` is `true`:
